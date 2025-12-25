@@ -1,0 +1,81 @@
+You are a SENIOR REACT + TYPESCRIPT + GITHUB API ENGINEER.
+
+TASK:
+Fix my existing GitHub Explorer website WITHOUT changing folder structure or core pages.
+ONLY fix bugs, improve stability, and enhance UX slightly.
+
+-----------------------------
+🔴 CURRENT ISSUE (CRITICAL)
+-----------------------------
+When a user searches repositories and clicks on any repo,
+this error appears:
+
+"Rendered more hooks than during the previous render"
+
+This happens in:
+- useRepoDetails hook
+- RepoChat page
+
+-----------------------------
+✅ REQUIRED FIX (MANDATORY)
+-----------------------------
+1. Fix React hook rule violation:
+   - Hooks must NOT be called conditionally
+   - useRepoDetails must always be called
+   - Use `enabled` option in React Query
+
+2. Update `useRepoDetails` hook:
+   - Accept `owner` and `repo` safely
+   - Use `enabled: !!owner && !!repo`
+   - Do NOT change function name or file location
+
+3. Update RepoChat page:
+   - Hook must be called at the TOP of component
+   - No hooks inside `if`, `return`, or condition
+   - Show placeholder UI if repo not selected
+
+-----------------------------
+🔗 REAL GITHUB LINK FEATURE
+-----------------------------
+When user clicks a repository:
+- Show a small button/link:
+  "View on GitHub"
+- It must open the REAL GitHub repo:
+  https://github.com/{owner}/{repo}
+- Open in new tab
+
+-----------------------------
+🎨 LANDING PAGE (LIGHT CHANGE ONLY)
+-----------------------------
+- Keep landing page minimal
+- Add ONE subtle AI-style illustration or abstract image
+- No heavy animations
+- Image should be decorative, not dominant
+- Keep "Get Started" button working
+- Clicking "Get Started" → Login page
+
+-----------------------------
+📁 IMPORTANT RULES
+-----------------------------
+- DO NOT change folder structure
+- DO NOT add backend
+- DO NOT remove existing pages
+- GitHub API must remain PUBLIC and WORLDWIDE
+- Search must return ANY repo globally
+- Repo click must NEVER crash
+
+-----------------------------
+🧪 FINAL RESULT EXPECTED
+-----------------------------
+✔ Search works
+✔ Clicking repo does NOT crash
+✔ RepoChat opens smoothly
+✔ Real GitHub link shown
+✔ Landing page looks slightly premium
+✔ No hook errors
+✔ Stable production-ready UI
+
+OUTPUT:
+- Give corrected code only where required
+- Minimal, clean, production-quality code
+- No unnecessary explanation

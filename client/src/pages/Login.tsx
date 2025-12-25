@@ -5,17 +5,40 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Github, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function Login() {
-  const { login } = useAuth();
+  const { loginAsNewUser, loginAsExistingUser, loginWithGithub } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
+  const [formData, setFormData] = useState({ email: "", password: "", name: "" });
+
+  const handleSignUp = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.email || !formData.name) return;
+    
+    setIsLoading(true);
+    setTimeout(() => {
+      loginAsNewUser(formData.email, formData.name);
+      setIsLoading(false);
+    }, 1000);
+  };
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!formData.email) return;
+    
     setIsLoading(true);
-    // Simulate API delay
     setTimeout(() => {
-      login();
+      loginAsExistingUser(formData.email);
+      setIsLoading(false);
+    }, 1000);
+  };
+
+  const handleGitHubLogin = () => {
+    setIsLoading(true);
+    setTimeout(() => {
+      loginWithGithub();
+      setIsLoading(false);
     }, 1000);
   };
 
@@ -40,38 +63,96 @@ export default function Login() {
                  <span className="font-display font-bold text-2xl">RepoChat</span>
                </div>
              </Link>
-             <h2 className="text-3xl font-bold tracking-tight">Welcome back</h2>
-             <p className="mt-2 text-muted-foreground">Sign in to access your dashboard</p>
            </div>
 
-           <form onSubmit={handleLogin} className="space-y-4">
-             <div className="space-y-2">
-               <label className="text-sm font-medium text-muted-foreground">Email</label>
-               <Input 
-                 type="email" 
-                 placeholder="name@example.com" 
-                 className="h-12 bg-white/5 border-white/10 rounded-xl focus:ring-primary/20"
-                 required
-               />
-             </div>
-             <div className="space-y-2">
-               <label className="text-sm font-medium text-muted-foreground">Password</label>
-               <Input 
-                 type="password" 
-                 placeholder="••••••••" 
-                 className="h-12 bg-white/5 border-white/10 rounded-xl focus:ring-primary/20"
-                 required
-               />
-             </div>
-             
-             <Button 
-               type="submit" 
-               className="w-full h-12 text-base rounded-xl bg-primary text-primary-foreground hover:bg-primary/90"
-               disabled={isLoading}
-             >
-               {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Sign In"}
-             </Button>
-           </form>
+           <Tabs defaultValue="login" className="w-full">
+             <TabsList className="grid w-full grid-cols-2">
+               <TabsTrigger value="login">Login</TabsTrigger>
+               <TabsTrigger value="signup">Sign Up</TabsTrigger>
+             </TabsList>
+
+             {/* Login Tab */}
+             <TabsContent value="login" className="space-y-6 mt-6">
+               <div className="space-y-2">
+                 <h2 className="text-2xl font-bold tracking-tight">Welcome back</h2>
+                 <p className="text-muted-foreground">Sign in to access your dashboard</p>
+               </div>
+
+               <form onSubmit={handleLogin} className="space-y-4">
+                 <div className="space-y-2">
+                   <label className="text-sm font-medium text-muted-foreground">Email</label>
+                   <Input 
+                     type="email" 
+                     placeholder="name@example.com"
+                     value={formData.email}
+                     onChange={(e) => setFormData({...formData, email: e.target.value})}
+                     className="h-12 bg-white/5 border-white/10 rounded-xl focus:ring-primary/20"
+                     required
+                   />
+                 </div>
+                 <div className="space-y-2">
+                   <label className="text-sm font-medium text-muted-foreground">Password</label>
+                   <Input 
+                     type="password" 
+                     placeholder="••••••••"
+                     value={formData.password}
+                     onChange={(e) => setFormData({...formData, password: e.target.value})}
+                     className="h-12 bg-white/5 border-white/10 rounded-xl focus:ring-primary/20"
+                     required
+                   />
+                 </div>
+                 
+                 <Button 
+                   type="submit" 
+                   className="w-full h-12 text-base rounded-xl bg-primary text-primary-foreground hover:bg-primary/90"
+                   disabled={isLoading || !formData.email}
+                 >
+                   {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Login"}
+                 </Button>
+               </form>
+             </TabsContent>
+
+             {/* Sign Up Tab */}
+             <TabsContent value="signup" className="space-y-6 mt-6">
+               <div className="space-y-2">
+                 <h2 className="text-2xl font-bold tracking-tight">Welcome to GitHub Explorer</h2>
+                 <p className="text-muted-foreground">Create your account to get started</p>
+               </div>
+
+               <form onSubmit={handleSignUp} className="space-y-4">
+                 <div className="space-y-2">
+                   <label className="text-sm font-medium text-muted-foreground">Full Name</label>
+                   <Input 
+                     type="text" 
+                     placeholder="John Doe"
+                     value={formData.name}
+                     onChange={(e) => setFormData({...formData, name: e.target.value})}
+                     className="h-12 bg-white/5 border-white/10 rounded-xl focus:ring-primary/20"
+                     required
+                   />
+                 </div>
+                 <div className="space-y-2">
+                   <label className="text-sm font-medium text-muted-foreground">Email</label>
+                   <Input 
+                     type="email" 
+                     placeholder="name@example.com"
+                     value={formData.email}
+                     onChange={(e) => setFormData({...formData, email: e.target.value})}
+                     className="h-12 bg-white/5 border-white/10 rounded-xl focus:ring-primary/20"
+                     required
+                   />
+                 </div>
+                 
+                 <Button 
+                   type="submit" 
+                   className="w-full h-12 text-base rounded-xl bg-primary text-primary-foreground hover:bg-primary/90"
+                   disabled={isLoading || !formData.email || !formData.name}
+                 >
+                   {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Create Account"}
+                 </Button>
+               </form>
+             </TabsContent>
+           </Tabs>
 
            <div className="relative">
              <div className="absolute inset-0 flex items-center">
@@ -82,9 +163,14 @@ export default function Login() {
              </div>
            </div>
 
-           <Button variant="outline" className="w-full h-12 rounded-xl border-white/10 hover:bg-white/5 gap-2" onClick={() => login()}>
+           <Button 
+             variant="outline" 
+             className="w-full h-12 rounded-xl border-white/10 hover:bg-white/5 gap-2"
+             onClick={handleGitHubLogin}
+             disabled={isLoading}
+           >
              <Github className="w-5 h-5" />
-             GitHub
+             Continue with GitHub
            </Button>
          </motion.div>
       </div>

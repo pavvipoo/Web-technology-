@@ -5,7 +5,7 @@ import { AppNavbar } from "@/components/Navigation";
 import { useRepoDetails } from "@/hooks/use-github";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Send, Bot, User as UserIcon, Loader2, Code2 } from "lucide-react";
+import { Send, Bot, User as UserIcon, Loader2, Code2, Github, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { type ChatMessage } from "@shared/schema";
 
@@ -13,23 +13,33 @@ export default function RepoChat() {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const [match, params] = useRoute("/chat/:owner/:name");
   
+  // Call hooks BEFORE any early returns (React rules)
+  const { data: repo, isLoading: repoLoading } = useRepoDetails(
+    params?.owner || "",
+    params?.name || ""
+  );
+  
   if (authLoading) return null;
   if (!isAuthenticated) return <Redirect to="/login" />;
   if (!match || !params) return <Redirect to="/search" />;
-
-  const { data: repo, isLoading: repoLoading } = useRepoDetails(params.owner, params.name);
   
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      id: "welcome",
-      role: "ai",
-      content: `Hello! I've analyzed the codebase for ${params.owner}/${params.name}. Ask me anything about the architecture, functions, or specific files.`,
-      timestamp: Date.now()
-    }
-  ]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (repo && messages.length === 0) {
+      setMessages([
+        {
+          id: "welcome",
+          role: "ai",
+          content: `Hello! I've analyzed the codebase for ${repo.full_name}. Ask me anything about the architecture, functions, or specific files.`,
+          timestamp: Date.now()
+        }
+      ]);
+    }
+  }, [repo?.full_name]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -79,17 +89,27 @@ export default function RepoChat() {
       
       <div className="flex-1 max-w-5xl mx-auto w-full p-4 md:p-6 flex flex-col min-h-0">
         {/* Header */}
-        <div className="flex items-center gap-4 mb-6 pb-6 border-b border-white/5">
-          <div className="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center border border-white/10">
-            <Code2 className="w-6 h-6 text-primary" />
+        <div className="flex items-center justify-between gap-4 mb-6 pb-6 border-b border-white/5">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center border border-white/10">
+              <Code2 className="w-6 h-6 text-primary" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold font-display">{repo?.full_name}</h1>
+              <p className="text-sm text-muted-foreground flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                Codebase Indexed • {repo?.language}
+              </p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-xl font-bold font-display">{repo?.full_name}</h1>
-            <p className="text-sm text-muted-foreground flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-              Codebase Indexed • {repo?.language}
-            </p>
-          </div>
+          {repo?.html_url && (
+            <a href={repo.html_url} target="_blank" rel="noopener noreferrer">
+              <Button variant="outline" size="sm" className="gap-2 border-white/10 hover:bg-white/5">
+                <ExternalLink className="w-4 h-4" />
+                View on GitHub
+              </Button>
+            </a>
+          )}
         </div>
 
         {/* Chat Area */}
