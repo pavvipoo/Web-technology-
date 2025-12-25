@@ -1,0 +1,294 @@
+You are a Senior Frontend Architect, UI/UX Designer, and GitHub API Expert.
+
+Your task is to BUILD A COMPLETE, PROFESSIONAL, PRODUCTION-READY FRONTEND WEBSITE named:
+
+GitHub Explorer Pro
+
+This must be a FULL WEBSITE, not a demo.
+
+🔴 STRICT RULES (VERY IMPORTANT)
+
+Frontend ONLY (NO backend, NO database)
+
+Use REAL GitHub Public REST API
+
+Worldwide public repositories (GLOBAL)
+
+Any user types ANY repository name or keyword → THAT repository MUST appear
+
+NO mock data
+
+NO fake repositories
+
+NO authentication backend (frontend login simulation only)
+
+Must work perfectly in Vite / Replit
+
+ZERO runtime errors
+
+ZERO TypeScript errors
+
+Clean, readable, professional code
+
+UI must be UNIQUE, PREMIUM, MODERN
+
+Folder structure must be SMALL, CLEAN, SIMPLE
+
+All pages must be connected and working
+
+🌍 GITHUB API REQUIREMENTS
+
+Use GitHub Search API
+
+Endpoint:
+
+https://api.github.com/search/repositories
+
+
+Must support:
+
+Any keyword
+
+Any repository name
+
+Any language
+
+Min stars
+
+Min forks
+
+Updated date
+
+Sorting
+
+Pagination
+
+Results must be worldwide public repositories
+
+Do NOT limit to top 30 or fixed repos
+
+📁 REQUIRED FOLDER STRUCTURE (KEEP EXACTLY)
+src/
+├── api/
+│   └── github.ts
+│
+├── components/
+│   ├── PublicNavbar.tsx
+│   ├── AppNavbar.tsx
+│   ├── ProtectedRoute.tsx
+│   ├── RepoCard.tsx
+│
+├── pages/
+│   ├── Landing.tsx
+│   ├── Login.tsx
+│   ├── Dashboard.tsx
+│   ├── Search.tsx
+│   ├── Trending.tsx
+│   ├── RepoChat.tsx
+│   ├── Bookmarks.tsx
+│   ├── Attachments.tsx
+│   ├── Profile.tsx
+│
+├── App.tsx
+├── main.tsx
+├── index.css
+
+
+⚠️ Do NOT add extra folders.
+
+🧭 PAGE REQUIREMENTS (ALL MUST EXIST)
+1️⃣ Landing Page (PUBLIC)
+
+Premium SaaS landing page
+
+Dark theme + gradient accents
+
+Hero section with illustration / image
+
+Navbar shows ONLY:
+
+Logo
+
+Features
+
+Get Started
+
+NO dashboard/search/bookmark links
+
+Clicking Get Started → Login page
+
+2️⃣ Login Page
+
+Premium split layout (form + image)
+
+Text:
+
+New user → “Welcome to GitHub Explorer”
+
+Old user → “Welcome back”
+
+Frontend-only login simulation
+
+On login success:
+
+localStorage.setItem("auth","true")
+
+AUTO redirect → Dashboard
+
+No confirmation popup
+
+3️⃣ Dashboard (AFTER LOGIN)
+
+AppNavbar visible ONLY after login
+
+Cards:
+
+⭐ Top Repo Stars → Search page
+
+📈 Growth Analytics → Trending page
+
+🔥 Trending Insights → Trending page
+
+💾 Bookmarks → Bookmarks page
+
+Logout button at top-right
+
+4️⃣ Search Page (WORLDWIDE – ADVANCED)
+
+Search ANY keyword or repository name
+
+Filters:
+
+Language
+
+Min stars
+
+Min forks
+
+Updated since
+
+Pagination
+
+Uses real GitHub API only
+
+Clicking repository → Repo Chat page
+
+5️⃣ Trending Page
+
+Worldwide trending public repositories
+
+Sort by:
+
+stars
+
+forks
+
+updated
+
+Real-time GitHub data
+
+6️⃣ Repo Chat Page (UNIQUE FEATURE)
+
+ChatGPT-style UI
+
+Repository-specific chat
+
+Unlimited messages
+
+Typing animation
+
+Frontend-only AI-style responses (simulated)
+
+7️⃣ Bookmarks Page
+
+Save repositories
+
+Store using LocalStorage
+
+Remove bookmarks
+
+Persist after refresh
+
+8️⃣ Attachments Page
+
+UI-only placeholder
+
+Premium “Coming Soon” layout
+
+9️⃣ Profile Page
+
+Show:
+
+Username (mock)
+
+Total searches
+
+Total bookmarks
+
+Editable avatar (UI-only)
+
+🔐 AUTH & ROUTING RULES
+
+Landing & Login → PublicNavbar only
+
+All other pages → AppNavbar
+
+Protected routes:
+
+If not logged in → redirect to Login
+
+Logout:
+
+Clears LocalStorage
+
+Redirects to Landing page
+
+🎨 UI / UX REQUIREMENTS
+
+Dark mode
+
+Glassmorphism cards
+
+Smooth hover & transitions
+
+Responsive (mobile + desktop)
+
+Clean typography
+
+Premium SaaS-style look
+
+UI must be DIFFERENT & UNIQUE
+
+🧪 TECH STACK (STRICT)
+
+React 18
+
+TypeScript
+
+Vite
+
+Tailwind CSS
+
+React Router v6
+
+GitHub Public REST API
+
+LocalStorage
+
+🏁 FINAL OUTPUT REQUIRED
+
+Provide FULL CODE for ALL FILES
+
+No missing pages
+
+No errors
+
+Ready to run with:
+
+npm install
+npm run dev
+
+BUILD THE COMPLETE WEBSITE NOW.
+DO NOT SKIP ANY PAGE.
+DO NOT ADD BACKEND.
+📌 COPY–PASTE PROMPT (END
