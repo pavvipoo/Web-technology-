@@ -1,37 +1,21 @@
-import { type User, type InsertUser } from "@shared/schema";
-import { randomUUID } from "crypto";
-
-// modify the interface with any CRUD methods
-// you might need
+import { db } from "./db";
+import {
+  type UserProfile, // Only using the types, no real storage needed for this frontend-only app
+} from "@shared/schema";
 
 export interface IStorage {
-  getUser(id: string): Promise<User | undefined>;
-  getUserByUsername(username: string): Promise<User | undefined>;
-  createUser(user: InsertUser): Promise<User>;
+  // We keep the interface minimal as requested for a frontend-only app
+  // But we need 'sessionStore' for express-session if we used it, 
+  // though we are simulating auth on frontend.
+  sessionStore: any;
 }
 
 export class MemStorage implements IStorage {
-  private users: Map<string, User>;
+  sessionStore: any;
 
   constructor() {
-    this.users = new Map();
-  }
-
-  async getUser(id: string): Promise<User | undefined> {
-    return this.users.get(id);
-  }
-
-  async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.username === username,
-    );
-  }
-
-  async createUser(insertUser: InsertUser): Promise<User> {
-    const id = randomUUID();
-    const user: User = { ...insertUser, id };
-    this.users.set(id, user);
-    return user;
+    // Minimal setup
+    this.sessionStore = null; 
   }
 }
 
