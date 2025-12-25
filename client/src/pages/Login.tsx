@@ -3,33 +3,70 @@ import { Link } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Github, Loader2 } from "lucide-react";
+import { Github, Loader2, AlertCircle } from "lucide-react";
 import { motion } from "framer-motion";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function Login() {
   const { loginAsNewUser, loginAsExistingUser, loginWithGithub } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
-  const [formData, setFormData] = useState({ email: "", password: "", name: "" });
+  const [error, setError] = useState("");
+  const [loginData, setLoginData] = useState({ email: "", password: "" });
+  const [signupData, setSignupData] = useState({ 
+    email: "", 
+    username: "", 
+    password: "", 
+    confirmPassword: "" 
+  });
 
   const handleSignUp = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.email || !formData.name) return;
+    setError("");
+
+    if (!signupData.email || !signupData.username || !signupData.password || !signupData.confirmPassword) {
+      setError("All fields are required");
+      return;
+    }
+
+    if (signupData.password.length < 6) {
+      setError("Password must be at least 6 characters");
+      return;
+    }
+
+    if (signupData.password !== signupData.confirmPassword) {
+      setError("Passwords do not match");
+      return;
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(signupData.email)) {
+      setError("Please enter a valid email");
+      return;
+    }
     
     setIsLoading(true);
     setTimeout(() => {
-      loginAsNewUser(formData.email, formData.name);
+      loginAsNewUser(signupData.email, signupData.username, signupData.password);
       setIsLoading(false);
     }, 1000);
   };
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.email) return;
+    setError("");
+
+    if (!loginData.email || !loginData.password) {
+      setError("Email and password are required");
+      return;
+    }
+
+    if (loginData.password.length < 6) {
+      setError("Invalid email or password");
+      return;
+    }
     
     setIsLoading(true);
     setTimeout(() => {
-      loginAsExistingUser(formData.email);
+      loginAsExistingUser(loginData.email, loginData.password);
       setIsLoading(false);
     }, 1000);
   };
@@ -78,14 +115,21 @@ export default function Login() {
                  <p className="text-muted-foreground">Sign in to access your dashboard</p>
                </div>
 
+               {error && (
+                 <div className="flex items-center gap-3 p-4 rounded-xl bg-red-500/10 border border-red-500/20">
+                   <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
+                   <p className="text-sm text-red-500">{error}</p>
+                 </div>
+               )}
+
                <form onSubmit={handleLogin} className="space-y-4">
                  <div className="space-y-2">
                    <label className="text-sm font-medium text-muted-foreground">Email</label>
                    <Input 
                      type="email" 
                      placeholder="name@example.com"
-                     value={formData.email}
-                     onChange={(e) => setFormData({...formData, email: e.target.value})}
+                     value={loginData.email}
+                     onChange={(e) => setLoginData({...loginData, email: e.target.value})}
                      className="h-12 bg-white/5 border-white/10 rounded-xl focus:ring-primary/20"
                      required
                    />
@@ -95,8 +139,8 @@ export default function Login() {
                    <Input 
                      type="password" 
                      placeholder="••••••••"
-                     value={formData.password}
-                     onChange={(e) => setFormData({...formData, password: e.target.value})}
+                     value={loginData.password}
+                     onChange={(e) => setLoginData({...loginData, password: e.target.value})}
                      className="h-12 bg-white/5 border-white/10 rounded-xl focus:ring-primary/20"
                      required
                    />
@@ -105,7 +149,7 @@ export default function Login() {
                  <Button 
                    type="submit" 
                    className="w-full h-12 text-base rounded-xl bg-primary text-primary-foreground hover:bg-primary/90"
-                   disabled={isLoading || !formData.email}
+                   disabled={isLoading}
                  >
                    {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Login"}
                  </Button>
@@ -115,18 +159,25 @@ export default function Login() {
              {/* Sign Up Tab */}
              <TabsContent value="signup" className="space-y-6 mt-6">
                <div className="space-y-2">
-                 <h2 className="text-2xl font-bold tracking-tight">Welcome to GitHub Explorer</h2>
-                 <p className="text-muted-foreground">Create your account to get started</p>
+                 <h2 className="text-2xl font-bold tracking-tight">Create Account</h2>
+                 <p className="text-muted-foreground">Join us to explore GitHub repositories</p>
                </div>
+
+               {error && (
+                 <div className="flex items-center gap-3 p-4 rounded-xl bg-red-500/10 border border-red-500/20">
+                   <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
+                   <p className="text-sm text-red-500">{error}</p>
+                 </div>
+               )}
 
                <form onSubmit={handleSignUp} className="space-y-4">
                  <div className="space-y-2">
-                   <label className="text-sm font-medium text-muted-foreground">Full Name</label>
+                   <label className="text-sm font-medium text-muted-foreground">Username</label>
                    <Input 
                      type="text" 
-                     placeholder="John Doe"
-                     value={formData.name}
-                     onChange={(e) => setFormData({...formData, name: e.target.value})}
+                     placeholder="johndoe"
+                     value={signupData.username}
+                     onChange={(e) => setSignupData({...signupData, username: e.target.value})}
                      className="h-12 bg-white/5 border-white/10 rounded-xl focus:ring-primary/20"
                      required
                    />
@@ -136,8 +187,30 @@ export default function Login() {
                    <Input 
                      type="email" 
                      placeholder="name@example.com"
-                     value={formData.email}
-                     onChange={(e) => setFormData({...formData, email: e.target.value})}
+                     value={signupData.email}
+                     onChange={(e) => setSignupData({...signupData, email: e.target.value})}
+                     className="h-12 bg-white/5 border-white/10 rounded-xl focus:ring-primary/20"
+                     required
+                   />
+                 </div>
+                 <div className="space-y-2">
+                   <label className="text-sm font-medium text-muted-foreground">Password</label>
+                   <Input 
+                     type="password" 
+                     placeholder="••••••••"
+                     value={signupData.password}
+                     onChange={(e) => setSignupData({...signupData, password: e.target.value})}
+                     className="h-12 bg-white/5 border-white/10 rounded-xl focus:ring-primary/20"
+                     required
+                   />
+                 </div>
+                 <div className="space-y-2">
+                   <label className="text-sm font-medium text-muted-foreground">Confirm Password</label>
+                   <Input 
+                     type="password" 
+                     placeholder="••••••••"
+                     value={signupData.confirmPassword}
+                     onChange={(e) => setSignupData({...signupData, confirmPassword: e.target.value})}
                      className="h-12 bg-white/5 border-white/10 rounded-xl focus:ring-primary/20"
                      required
                    />
@@ -146,7 +219,7 @@ export default function Login() {
                  <Button 
                    type="submit" 
                    className="w-full h-12 text-base rounded-xl bg-primary text-primary-foreground hover:bg-primary/90"
-                   disabled={isLoading || !formData.email || !formData.name}
+                   disabled={isLoading}
                  >
                    {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Create Account"}
                  </Button>

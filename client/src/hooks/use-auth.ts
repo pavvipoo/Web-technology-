@@ -12,27 +12,38 @@ export function useAuth() {
     setIsLoading(false);
   }, []);
 
-  const loginAsNewUser = (email: string, name: string) => {
+  const loginAsNewUser = (email: string, username: string, password: string) => {
+    // Store user credentials in localStorage (simulated)
+    const userId = `user_${Date.now()}`;
     localStorage.setItem("auth", "true");
+    localStorage.setItem("userId", userId);
     localStorage.setItem("userType", "new");
-    localStorage.setItem("username", name);
+    localStorage.setItem("username", username);
     localStorage.setItem("email", email);
+    // In a real app, NEVER store passwords in localStorage
+    // For this demo only, we're storing it for validation
+    localStorage.setItem("password_hash", btoa(password));
     localStorage.setItem("joinDate", new Date().toISOString());
     setIsAuthenticated(true);
     setLocation("/dashboard");
   };
 
-  const loginAsExistingUser = (email: string) => {
-    const username = email.split("@")[0];
-    localStorage.setItem("auth", "true");
-    localStorage.setItem("userType", "existing");
-    localStorage.setItem("username", username);
-    localStorage.setItem("email", email);
-    if (!localStorage.getItem("joinDate")) {
-      localStorage.setItem("joinDate", new Date().toISOString());
+  const loginAsExistingUser = (email: string, password: string) => {
+    // Validate stored credentials
+    const storedEmail = localStorage.getItem("email");
+    const storedPasswordHash = localStorage.getItem("password_hash");
+    
+    if (storedEmail === email && storedPasswordHash === btoa(password)) {
+      localStorage.setItem("auth", "true");
+      if (!localStorage.getItem("userType")) {
+        localStorage.setItem("userType", "existing");
+      }
+      setIsAuthenticated(true);
+      setLocation("/dashboard");
+    } else {
+      // Invalid credentials - don't set auth
+      console.error("Invalid email or password");
     }
-    setIsAuthenticated(true);
-    setLocation("/dashboard");
   };
 
   const loginWithGithub = () => {

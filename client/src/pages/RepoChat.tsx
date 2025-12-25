@@ -10,23 +10,22 @@ import { cn } from "@/lib/utils";
 import { type ChatMessage } from "@shared/schema";
 
 export default function RepoChat() {
+  // ALL HOOKS MUST BE CALLED HERE - BEFORE ANY EARLY RETURNS
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const [match, params] = useRoute("/chat/:owner/:name");
-  
-  // Call hooks BEFORE any early returns (React rules)
   const { data: repo, isLoading: repoLoading } = useRepoDetails(
     params?.owner || "",
     params?.name || ""
   );
-  
-  if (authLoading) return null;
-  if (!isAuthenticated) return <Redirect to="/login" />;
-  if (!match || !params) return <Redirect to="/search" />;
-  
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // NOW we can have early returns
+  if (authLoading) return null;
+  if (!isAuthenticated) return <Redirect to="/login" />;
+  if (!match || !params) return <Redirect to="/search" />;
 
   useEffect(() => {
     if (repo && messages.length === 0) {
