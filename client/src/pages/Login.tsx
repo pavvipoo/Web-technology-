@@ -19,7 +19,7 @@ export default function Login() {
     confirmPassword: "" 
   });
 
-  const handleSignUp = (e: React.FormEvent) => {
+  const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
 
@@ -44,13 +44,14 @@ export default function Login() {
     }
     
     setIsLoading(true);
-    setTimeout(() => {
-      loginAsNewUser(signupData.email, signupData.username, signupData.password);
+    const result = await loginAsNewUser(signupData.email, signupData.username, signupData.password);
+    if (!result.success) {
+      setError(result.error || "Sign up failed");
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
 
@@ -65,18 +66,20 @@ export default function Login() {
     }
     
     setIsLoading(true);
-    setTimeout(() => {
-      loginAsExistingUser(loginData.email, loginData.password);
+    const result = await loginAsExistingUser(loginData.email, loginData.password);
+    if (!result.success) {
+      setError(result.error || "Login failed");
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
-  const handleGitHubLogin = () => {
+  const handleGitHubLogin = async () => {
     setIsLoading(true);
-    setTimeout(() => {
-      loginWithGithub();
-      setIsLoading(false);
-    }, 1000);
+    const result = await loginWithGithub();
+    if (!result.success) {
+      setError(result.error || "GitHub login failed");
+    }
+    setIsLoading(false);
   };
 
   return (
