@@ -1,64 +1,41 @@
 import { useState, useEffect, useCallback } from "react";
 import { useLocation } from "wouter";
-import {
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-  signOut,
-  onAuthStateChanged,
-  updateProfile,
-  User,
-  AuthError,
-} from "firebase/auth";
-import { auth } from "@/lib/firebase";
 
 export function useAuth() {
-  const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [, setLocation] = useLocation();
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-      setIsAuthenticated(!!currentUser);
-      setIsLoading(false);
-    });
-
-    return () => unsubscribe();
+    const auth = localStorage.getItem("auth");
+    setIsAuthenticated(auth === "true");
+    setIsLoading(false);
   }, []);
 
   const signUp = useCallback(
     async (email: string, password: string, username: string) => {
       try {
-        const { user: newUser } = await createUserWithEmailAndPassword(
-          auth,
-          email,
-          password
-        );
+        if (!email || !password || !username) {
+          return { success: false, error: "All fields required" };
+        }
 
-        await updateProfile(newUser, {
-          displayName: username,
-        });
+        if (password.length < 6) {
+          return { success: false, error: "Password must be at least 6 characters" };
+        }
 
-        setUser(newUser);
+        const userId = `user_${Date.now()}`;
+        localStorage.setItem("auth", "true");
+        localStorage.setItem("userId", userId);
+        localStorage.setItem("username", username);
+        localStorage.setItem("email", email);
+        localStorage.setItem("password_hash", btoa(password));
+        localStorage.setItem("joinDate", new Date().toISOString());
+
         setIsAuthenticated(true);
         setLocation("/dashboard");
         return { success: true };
       } catch (error) {
-        const authError = error as AuthError;
-        let message = "An error occurred during sign up";
-
-        if (authError.code === "auth/email-already-in-use") {
-          message = "Email already in use";
-        } else if (authError.code === "auth/invalid-email") {
-          message = "Invalid email address";
-        } else if (authError.code === "auth/weak-password") {
-          message = "Password is too weak (min 6 characters)";
-        } else if (authError.message) {
-          message = authError.message;
-        }
-
-        return { success: false, error: message };
+        return { success: false, error: "Sign up failed" };
       }
     },
     [setLocation]
@@ -67,47 +44,27 @@ export function useAuth() {
   const login = useCallback(
     async (email: string, password: string) => {
       try {
-        const { user: loginUser } = await signInWithEmailAndPassword(
-          auth,
-          email,
-          password
-        );
+        const storedEmail = localStorage.getItem("email");
+        const storedPasswordHash = localStorage.getItem("password_hash");
 
-        setUser(loginUser);
-        setIsAuthenticated(true);
-        setLocation("/dashboard");
-        return { success: true };
-      } catch (error) {
-        const authError = error as AuthError;
-        let message = "Invalid email or password";
-
-        if (authError.code === "auth/user-not-found") {
-          message = "Invalid email or password";
-        } else if (authError.code === "auth/wrong-password") {
-          message = "Invalid email or password";
-        } else if (authError.code === "auth/invalid-email") {
-          message = "Invalid email address";
-        } else if (authError.message) {
-          message = authError.message;
+        if (!storedEmail || !storedPasswordHash) {
+          return { success: false, error: "Invalid email or password" };
         }
 
-        return { success: false, error: message };
+        if (storedEmail === email && storedPasswordHash === btoa(password)) {
+          localStorage.setItem("auth", "true");
+          setIsAuthenticated(true);
+          setLocation("/dashboard");
+          return { success: true };
+        }
+
+        return { success: false, error: "Invalid email or password" };
+      } catch (error) {
+        return { success: false, error: "Login failed" };
       }
     },
     [setLocation]
   );
-
-  const logout = useCallback(async () => {
-    try {
-      await signOut(auth);
-      setUser(null);
-      setIsAuthenticated(false);
-      setLocation("/");
-    } catch (error) {
-      const authError = error as AuthError;
-      console.error("Logout error:", authError.message);
-    }
-  }, [setLocation]);
 
   const loginAsNewUser = (email: string, username: string, password: string) => {
     return signUp(email, password, username);
@@ -118,14 +75,18 @@ export function useAuth() {
   };
 
   const loginWithGithub = async () => {
-    console.log("GitHub login not yet implemented with Firebase");
     return { success: false, error: "GitHub login coming soon" };
   };
+
+  const logout = useCallback(() => {
+    localStorage.clear();
+    setIsAuthenticated(false);
+    setLocation("/");
+  }, [setLocation]);
 
   return {
     isAuthenticated,
     isLoading,
-    user,
     loginAsNewUser,
     loginAsExistingUser,
     loginWithGithub,
