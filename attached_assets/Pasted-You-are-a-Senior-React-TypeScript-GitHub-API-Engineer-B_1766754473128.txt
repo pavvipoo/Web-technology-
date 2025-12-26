@@ -1,0 +1,149 @@
+You are a Senior React + TypeScript + GitHub API Engineer.
+Build and FIX a production-ready GitHub Explorer / RepoChat web app.
+Follow ALL rules strictly. No placeholders. No fake data.
+
+1️⃣ CRITICAL BUG TO FIX (MANDATORY)
+❌ Current Error
+Rendered more hooks than during the previous render
+
+✅ Root Cause
+
+Hooks (useEffect, useQuery, etc.) are called conditionally
+
+Early return, redirect, or if BEFORE hooks
+
+✅ FIX RULE (STRICT)
+
+ALL hooks must be called unconditionally
+
+No return, redirect, or if before hooks
+
+Use guards INSIDE effects or render JSX conditionally
+
+✅ REQUIRED FIX (RepoChat.tsx)
+
+Move all hooks to top
+
+Replace conditional redirect with:
+
+useEffect(() => {
+  if (!owner || !repo) navigate("/search");
+}, [owner, repo]);
+
+2️⃣ SEARCH → REPO → GITHUB FLOW (MANDATORY)
+🔍 Search
+
+Use GitHub REST API (PUBLIC, WORLDWIDE)
+
+Endpoint:
+
+GET https://api.github.com/search/repositories?q={query}&sort=stars&order=desc
+
+📦 Results
+
+Show EXACT repos user searched
+
+No top-30 only
+
+Global, public repos only
+
+👉 On Repo Click
+
+Two actions:
+
+Open RepoChat page (internal)
+
+Show small external GitHub link
+
+https://github.com/{owner}/{repo}
+
+3️⃣ REPO CHAT PAGE (STABLE)
+RULES
+
+Hooks always at top
+
+Repo params from router
+
+No conditional hook calls
+
+Chat loads only AFTER repo exists
+
+Chat Behavior
+
+Initial message:
+
+“Ask anything about this repository”
+
+No AI backend (mock allowed)
+
+NO crash on refresh
+
+4️⃣ AUTH SYSTEM (REQUIRED)
+Pages
+
+/login
+
+/signup
+
+/dashboard
+
+Login Rules
+
+Email + Password required
+
+If email ❌ → show error
+
+If password ❌ → show error
+
+If both ✅ → redirect to /dashboard
+
+Signup Rules
+
+New user signup → redirect to /dashboard
+
+Store auth state in:
+
+localStorage
+
+or simple in-memory context
+
+After Login / Signup
+
+AUTO redirect (no button click)
+
+Show toast:
+
+“Welcome back 👋”
+
+“Welcome to GitHub Explorer 🚀”
+
+5️⃣ DASHBOARD RULES
+
+Visible ONLY after login
+
+Navbar appears ONLY after login
+
+Logout button (top-right)
+
+Logout clears auth → redirect to /login
+
+6️⃣ LANDING PAGE (LIGHT)
+
+Public page
+
+Small AI-style image/illustration
+
+ONE CTA:
+👉 Get Started
+
+Clicking → /login
+
+No dashboard menu here
+
+7️⃣ REQUIRED ROUTES
+/
+ /login
+ /signup
+ /dashboard
+ /search
+ /repo/:owner/:repo
