@@ -1,32 +1,47 @@
-import { useState, useEffect, useRef } from "react";
-import { useRoute, Redirect } from "wouter";
+import { useState, useEffect, useRef, useMemo } from "react";
+import { useRoute, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { AppNavbar } from "@/components/Navigation";
 import { useRepoDetails } from "@/hooks/use-github";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Send, Bot, User as UserIcon, Loader2, Code2, Github, ExternalLink } from "lucide-react";
+import { Send, Bot, User as UserIcon, Loader2, Code2, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { type ChatMessage } from "@shared/schema";
 
 export default function RepoChat() {
-  // ALL HOOKS MUST BE CALLED HERE - BEFORE ANY EARLY RETURNS
+  // === STEP 1: CALL ALL HOOKS FIRST ===
   const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const [, setLocation] = useLocation();
   const [match, params] = useRoute("/chat/:owner/:name");
-  const { data: repo, isLoading: repoLoading } = useRepoDetails(
-    params?.owner || "",
-    params?.name || ""
-  );
+  
+  // Safely extract params
+  const owner = params?.owner || "";
+  const name = params?.name || "";
+  
+  // Query hook ALWAYS called
+  const { data: repo, isLoading: repoLoading } = useRepoDetails(owner, name);
+  
+  // All state hooks
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  
+  // === STEP 2: GUARD EFFECTS (CHECKS AFTER ALL HOOKS) ===
+  useEffect(() => {
+    if (authLoading) return;
+    if (!isAuthenticated) {
+      setLocation("/login");
+      return;
+    }
+    if (!match) {
+      setLocation("/search");
+      return;
+    }
+  }, [authLoading, isAuthenticated, match, setLocation]);
 
-  // NOW we can have early returns
-  if (authLoading) return null;
-  if (!isAuthenticated) return <Redirect to="/login" />;
-  if (!match || !params) return <Redirect to="/search" />;
-
+  // === STEP 3: BUSINESS LOGIC EFFECTS ===
   useEffect(() => {
     if (repo && messages.length === 0) {
       setMessages([
@@ -74,10 +89,34 @@ export default function RepoChat() {
     }, 1500);
   };
 
+  // === STEP 4: CONDITIONAL RENDER (SAFE - AFTER ALL HOOKS & EFFECTS) ===
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="w-10 h-10 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!isAuthenticated || !match || !owner || !name) {
+    return null;
+  }
+
   if (repoLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Loader2 className="w-10 h-10 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!repo) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-muted-foreground mb-4">Repository not found</p>
+          <Button onClick={() => setLocation("/search")}>Back to Search</Button>
+        </div>
       </div>
     );
   }
