@@ -86,16 +86,19 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen grid lg:grid-cols-2">
+    <div className="min-h-screen grid lg:grid-cols-2 bg-background">
       {/* Left: Login Form */}
-      <div className="flex items-center justify-center p-8 bg-background relative overflow-hidden">
-         {/* Background decoration */}
-         <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-blue-500 to-purple-500" />
+      <div className="flex items-center justify-center p-4 sm:p-8 bg-background relative overflow-hidden">
+         {/* Animated background decoration */}
+         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500" />
+         <div className="absolute -top-20 -left-20 w-40 h-40 bg-primary/20 rounded-full blur-3xl" />
+         <div className="absolute -bottom-20 -right-20 w-40 h-40 bg-purple-500/20 rounded-full blur-3xl" />
          
          <motion.div 
            initial={{ opacity: 0, scale: 0.95 }}
            animate={{ opacity: 1, scale: 1 }}
-           className="w-full max-w-md space-y-8"
+           transition={{ duration: 0.5 }}
+           className="w-full max-w-md space-y-8 relative z-10"
          >
            <div className="text-center">
              <Link href="/">
@@ -255,22 +258,80 @@ export default function Login() {
       </div>
 
       {/* Right: Visual */}
-      <div className="hidden lg:flex flex-col justify-center p-12 bg-secondary/20 relative border-l border-white/5">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-purple-500/20 via-background to-background" />
+      <div className="hidden lg:flex flex-col justify-center items-center p-12 bg-gradient-to-br from-primary/10 via-background to-purple-500/10 relative border-l border-white/5">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_right,_var(--tw-gradient-stops))] from-purple-500/30 via-transparent to-transparent" />
+        <div className="absolute top-20 right-20 w-64 h-64 bg-primary/20 rounded-full blur-3xl" />
         
-        <div className="relative z-10 max-w-xl mx-auto">
-          <h2 className="text-4xl font-display font-bold mb-6">Analyze code at the speed of thought.</h2>
-          <p className="text-xl text-muted-foreground mb-8">
-            "RepoChat has completely transformed how I onboard to new codebases. It's like having the lead maintainer sitting next to you."
-          </p>
-          
-          <div className="flex items-center gap-4">
-             <div className="w-12 h-12 rounded-full bg-white/10" />
+        <div className="relative z-10 max-w-xl">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="mb-12"
+          >
+            <div className="text-center mb-8">
+              <div className="inline-flex items-center gap-3 mb-6 px-4 py-2 rounded-full bg-white/5 border border-primary/30">
+                <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                <span className="text-sm text-primary">AI-Powered Analysis</span>
+              </div>
+              <h2 className="text-5xl font-display font-bold mb-6 bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
+                Analyze code at the speed of thought.
+              </h2>
+              <p className="text-lg text-muted-foreground mb-8">
+                Powered by Gemini AI • Lightning-fast search • Real-time insights
+              </p>
+            </div>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.5 }}
+            className="space-y-4"
+          >
+            <div className="flex items-start gap-4 p-4 rounded-xl bg-white/5 border border-white/10 hover:border-primary/30 transition-colors">
+              <div className="w-12 h-12 rounded-lg bg-primary/20 flex items-center justify-center flex-shrink-0">
+                <span className="text-primary font-bold">🔍</span>
+              </div>
+              <div>
+                <div className="font-semibold">Smart Search</div>
+                <div className="text-sm text-muted-foreground">Find millions of repositories instantly</div>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-4 p-4 rounded-xl bg-white/5 border border-white/10 hover:border-primary/30 transition-colors">
+              <div className="w-12 h-12 rounded-lg bg-primary/20 flex items-center justify-center flex-shrink-0">
+                <span className="text-primary font-bold">💬</span>
+              </div>
+              <div>
+                <div className="font-semibold">AI Chat</div>
+                <div className="text-sm text-muted-foreground">Ask about code, architecture, and more</div>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-4 p-4 rounded-xl bg-white/5 border border-white/10 hover:border-primary/30 transition-colors">
+              <div className="w-12 h-12 rounded-lg bg-primary/20 flex items-center justify-center flex-shrink-0">
+                <span className="text-primary font-bold">📚</span>
+              </div>
+              <div>
+                <div className="font-semibold">Bookmarks</div>
+                <div className="text-sm text-muted-foreground">Save and organize your favorite repos</div>
+              </div>
+            </div>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.7 }}
+            className="mt-8 pt-8 border-t border-white/10 flex items-center gap-4"
+          >
+             <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-purple-500" />
              <div>
-               <div className="font-bold">Alex Chen</div>
-               <div className="text-sm text-muted-foreground">Senior Engineer at Vercel</div>
+               <div className="font-semibold text-sm">Trusted by developers</div>
+               <div className="text-xs text-muted-foreground">Join 1000+ developers using GitHub Explorer</div>
              </div>
-          </div>
+          </motion.div>
         </div>
       </div>
     </div>
