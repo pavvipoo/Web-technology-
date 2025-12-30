@@ -42,6 +42,9 @@ export const userProfileSchema = z.object({
 
 export type UserProfile = z.infer<typeof userProfileSchema>;
 
+// Export chat schema from models
+export * from "./models/chat";
+
 // For Repo Chat messages
 export const chatMessageSchema = z.object({
   id: z.string(),

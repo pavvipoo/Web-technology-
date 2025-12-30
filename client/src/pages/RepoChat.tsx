@@ -61,7 +61,7 @@ export default function RepoChat() {
     }
   }, [messages, isTyping]);
 
-  const handleSend = (e: React.FormEvent) => {
+  const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim()) return;
 
@@ -76,17 +76,71 @@ export default function RepoChat() {
     setInput("");
     setIsTyping(true);
 
-    // Simulate AI response
-    setTimeout(() => {
-      const aiMsg: ChatMessage = {
+    try {
+      // Call real Gemini API with repo context
+      const context = `Repository: ${repo?.full_name}
+Language: ${repo?.language || "unknown"}
+Description: ${repo?.description || "No description"}
+URL: ${repo?.html_url}
+
+User question: ${input}
+
+Please provide a helpful answer about this repository.`;
+
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: context }),
+      });
+
+      if (!response.ok) throw new Error("Failed to get response");
+
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error("No response body");
+
+      let aiContent = "";
+      const decoder = new TextDecoder();
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const text = decoder.decode(value);
+        const lines = text.split("\n");
+        
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              if (data.content) {
+                aiContent += data.content;
+              }
+            } catch {}
+          }
+        }
+      }
+
+      if (aiContent.trim()) {
+        const aiMsg: ChatMessage = {
+          id: (Date.now() + 1).toString(),
+          role: "ai",
+          content: aiContent,
+          timestamp: Date.now()
+        };
+        setMessages(prev => [...prev, aiMsg]);
+      }
+    } catch (error) {
+      console.error("Error getting AI response:", error);
+      const errorMsg: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: "ai",
-        content: `I've found some relevant code in the src/ directory. It seems like you're asking about "${userMsg.content}". This pattern is typically implemented in the core utils file.`,
+        content: "Sorry, I had trouble analyzing the repository. Please try again.",
         timestamp: Date.now()
       };
-      setMessages(prev => [...prev, aiMsg]);
+      setMessages(prev => [...prev, errorMsg]);
+    } finally {
       setIsTyping(false);
-    }, 1500);
+    }
   };
 
   // === STEP 4: CONDITIONAL RENDER (SAFE - AFTER ALL HOOKS & EFFECTS) ===
