@@ -45,5 +45,5 @@ export function useBookmarks() {
     return bookmarks.some(b => b.id === repoId);
   };
 
-  return { bookmarks, addBookmark, removeBookmark, isBookmarked };
+  return { bookmarks, addBookmark, removeBookmark, isBookmarked, count: bookmarks.length };
 }

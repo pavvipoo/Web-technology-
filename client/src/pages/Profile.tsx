@@ -1,5 +1,7 @@
 import { AppNavbar } from "@/components/Navigation";
 import { useAuth } from "@/hooks/use-auth";
+import { useBookmarks } from "@/hooks/use-bookmarks";
+import { useSearchHistory } from "@/hooks/use-search-history";
 import { Redirect } from "wouter";
 import { Mail, Calendar } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -7,6 +9,16 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 
 export default function Profile() {
   const { isAuthenticated, isLoading: authLoading, logout } = useAuth();
+  const { bookmarks } = useBookmarks();
+  
+  const searchHistoryData = (() => {
+    const saved = localStorage.getItem("searchHistory");
+    try {
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  })();
 
   if (authLoading) return null;
   if (!isAuthenticated) return <Redirect to="/login" />;
@@ -21,6 +33,14 @@ export default function Profile() {
         month: "long",
       })
     : "January 2024";
+  
+  const bookmarkCount = bookmarks.length;
+  const searchCount = searchHistoryData.length;
+  
+  const handleClearHistory = () => {
+    localStorage.setItem("searchHistory", JSON.stringify([]));
+    window.location.reload();
+  };
 
   const loginTypeLabel = 
     userType === "new" ? "New User" :
@@ -79,6 +99,38 @@ export default function Profile() {
                 </div>
               </div>
             </div>
+
+            <div className="border-t border-white/10 pt-8 mb-8">
+              <h3 className="font-bold mb-4">Your Activity</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-4 rounded-xl bg-white/5">
+                  <div className="text-2xl font-bold text-primary">{bookmarkCount}</div>
+                  <div className="text-sm text-muted-foreground">Bookmarked Repos</div>
+                </div>
+                <div className="p-4 rounded-xl bg-white/5">
+                  <div className="text-2xl font-bold text-purple-400">{searchCount}</div>
+                  <div className="text-sm text-muted-foreground">Search History</div>
+                </div>
+              </div>
+            </div>
+
+            {searchCount > 0 && (
+              <div className="border-t border-white/10 pt-8 mb-8">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-bold">Recent Searches</h3>
+                  <Button variant="ghost" size="sm" onClick={handleClearHistory} className="text-xs">
+                    Clear
+                  </Button>
+                </div>
+                <div className="space-y-2 max-h-40 overflow-y-auto">
+                  {searchHistoryData.slice(0, 5).map((item: any, idx: number) => (
+                    <div key={idx} className="text-sm p-2 rounded bg-white/5">
+                      "{item.query}" • {item.repoCount} repos
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div className="flex justify-center">
                <Button variant="destructive" onClick={logout} className="w-full sm:w-auto">

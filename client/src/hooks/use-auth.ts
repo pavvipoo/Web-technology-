@@ -4,11 +4,17 @@ import { useLocation } from "wouter";
 export function useAuth() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [, setLocation] = useLocation();
 
   useEffect(() => {
     const auth = localStorage.getItem("auth");
+    const storedUsername = localStorage.getItem("username");
+    const storedEmail = localStorage.getItem("email");
     setIsAuthenticated(auth === "true");
+    if (storedUsername) setUsername(storedUsername);
+    if (storedEmail) setEmail(storedEmail);
     setIsLoading(false);
   }, []);
 
@@ -24,14 +30,20 @@ export function useAuth() {
         }
 
         const userId = `user_${Date.now()}`;
+        const passwordHash = btoa(`${email}:${password}`);
+        
         localStorage.setItem("auth", "true");
         localStorage.setItem("userId", userId);
         localStorage.setItem("username", username);
         localStorage.setItem("email", email);
-        localStorage.setItem("password_hash", btoa(password));
+        localStorage.setItem("passwordHash", passwordHash);
         localStorage.setItem("joinDate", new Date().toISOString());
+        localStorage.setItem("bookmarks", JSON.stringify([]));
+        localStorage.setItem("searchHistory", JSON.stringify([]));
 
         setIsAuthenticated(true);
+        setUsername(username);
+        setEmail(email);
         setLocation("/dashboard");
         return { success: true };
       } catch (error) {
@@ -45,15 +57,19 @@ export function useAuth() {
     async (email: string, password: string) => {
       try {
         const storedEmail = localStorage.getItem("email");
-        const storedPasswordHash = localStorage.getItem("password_hash");
+        const storedPasswordHash = localStorage.getItem("passwordHash");
 
         if (!storedEmail || !storedPasswordHash) {
           return { success: false, error: "Invalid email or password" };
         }
 
-        if (storedEmail === email && storedPasswordHash === btoa(password)) {
+        const incomingHash = btoa(`${email}:${password}`);
+
+        if (storedEmail === email && storedPasswordHash === incomingHash) {
           localStorage.setItem("auth", "true");
           setIsAuthenticated(true);
+          setEmail(email);
+          setUsername(localStorage.getItem("username") || "");
           setLocation("/dashboard");
           return { success: true };
         }
@@ -81,12 +97,16 @@ export function useAuth() {
   const logout = useCallback(() => {
     localStorage.clear();
     setIsAuthenticated(false);
+    setUsername("");
+    setEmail("");
     setLocation("/");
   }, [setLocation]);
 
   return {
     isAuthenticated,
     isLoading,
+    username,
+    email,
     loginAsNewUser,
     loginAsExistingUser,
     loginWithGithub,

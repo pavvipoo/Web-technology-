@@ -4,20 +4,24 @@ import { Link, Redirect } from "wouter";
 import { motion } from "framer-motion";
 import { Search, TrendingUp, Bookmark, Github, ArrowRight } from "lucide-react";
 import { useTrendingRepos } from "@/hooks/use-github";
+import { useBookmarks } from "@/hooks/use-bookmarks";
+import { useSearchHistory } from "@/hooks/use-search-history";
 import { RepoCard } from "@/components/RepoCard";
 import { Button } from "@/components/ui/button";
 
 export default function Dashboard() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, username } = useAuth();
   const { data: trending, isLoading: isLoadingTrending } = useTrendingRepos();
+  const { count: bookmarkCount } = useBookmarks();
+  const { count: searchCount } = useSearchHistory();
 
   if (isLoading) return null;
   if (!isAuthenticated) return <Redirect to="/login" />;
 
   const stats = [
-    { label: "Bookmarked Repos", value: "12", icon: Bookmark, color: "text-blue-400" },
-    { label: "Recent Searches", value: "48", icon: Search, color: "text-purple-400" },
-    { label: "Code Analyzed", value: "1.2M", icon: Github, color: "text-green-400" },
+    { label: "Bookmarked Repos", value: bookmarkCount.toString(), icon: Bookmark, color: "text-blue-400" },
+    { label: "Recent Searches", value: searchCount.toString(), icon: Search, color: "text-purple-400" },
+    { label: "Code Analyzed", value: searchCount > 0 ? "1.2M" : "0", icon: Github, color: "text-green-400" },
   ];
 
   return (
@@ -30,7 +34,7 @@ export default function Dashboard() {
           animate={{ opacity: 1, y: 0 }}
           className="mb-12"
         >
-          <h1 className="text-3xl font-display font-bold mb-2">Welcome back, User</h1>
+          <h1 className="text-3xl font-display font-bold mb-2">Welcome back, {username || "Developer"}</h1>
           <p className="text-muted-foreground">Here's what's happening in your developer universe today.</p>
         </motion.div>
 

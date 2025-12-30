@@ -45,9 +45,12 @@ export default function Login() {
     
     setIsLoading(true);
     const result = await loginAsNewUser(signupData.email, signupData.username, signupData.password);
+    setIsLoading(false);
     if (!result.success) {
       setError(result.error || "Sign up failed");
-      setIsLoading(false);
+    } else {
+      // Clear form on success
+      setSignupData({ email: "", username: "", password: "", confirmPassword: "" });
     }
   };
 
