@@ -95,7 +95,11 @@ export function useAuth() {
   };
 
   const logout = useCallback(() => {
-    localStorage.clear();
+    // Only clear auth flag and session data, keep email/password for future logins
+    localStorage.removeItem("auth");
+    localStorage.removeItem("userId");
+    localStorage.removeItem("bookmarks");
+    localStorage.removeItem("searchHistory");
     setIsAuthenticated(false);
     setUsername("");
     setEmail("");
