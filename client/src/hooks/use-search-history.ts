@@ -1,8 +1,19 @@
 import { useState, useEffect, useCallback } from "react";
 
+export interface Repository {
+  id: number;
+  full_name: string;
+  name: string;
+  description: string | null;
+  stargazers_count: number;
+  language: string | null;
+  html_url: string;
+}
+
 export interface SearchRecord {
   query: string;
   timestamp: number;
+  repositories: Repository[];
   repoCount: number;
 }
 
@@ -20,9 +31,9 @@ export function useSearchHistory() {
     }
   }, []);
 
-  const addSearch = useCallback((query: string, repoCount: number) => {
+  const addSearch = useCallback((query: string, repositories: Repository[]) => {
     setHistory(prev => {
-      const updated = [{ query, timestamp: Date.now(), repoCount }, ...prev].slice(0, 50);
+      const updated = [{ query, timestamp: Date.now(), repositories, repoCount: repositories.length }, ...prev].slice(0, 50);
       localStorage.setItem("searchHistory", JSON.stringify(updated));
       return updated;
     });

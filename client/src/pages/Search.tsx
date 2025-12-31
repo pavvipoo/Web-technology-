@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { AppNavbar } from "@/components/Navigation";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useGithubSearch } from "@/hooks/use-github";
+import { useSearchHistory } from "@/hooks/use-search-history";
 import { RepoCard } from "@/components/RepoCard";
 import { Search as SearchIcon, Loader2, Filter } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
@@ -11,11 +12,19 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 
 export default function Search() {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { addSearch } = useSearchHistory();
   const [query, setQuery] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [language, setLanguage] = useState("");
   
   const { data: repos, isLoading, error } = useGithubSearch(searchTerm, language);
+
+  // Save repositories to search history when results arrive
+  useEffect(() => {
+    if (repos && repos.length > 0 && searchTerm) {
+      addSearch(searchTerm, repos);
+    }
+  }, [repos, searchTerm, addSearch]);
 
   if (authLoading) return null;
   if (!isAuthenticated) return <Redirect to="/login" />;

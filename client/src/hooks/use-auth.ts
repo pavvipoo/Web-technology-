@@ -56,16 +56,24 @@ export function useAuth() {
   const login = useCallback(
     async (email: string, password: string) => {
       try {
+        if (!email || !password) {
+          return { success: false, error: "Email and password are required" };
+        }
+
         const storedEmail = localStorage.getItem("email");
         const storedPasswordHash = localStorage.getItem("passwordHash");
 
         if (!storedEmail || !storedPasswordHash) {
+          return { success: false, error: "No account found with this email. Please sign up first." };
+        }
+
+        if (storedEmail !== email) {
           return { success: false, error: "Invalid email or password" };
         }
 
         const incomingHash = btoa(`${email}:${password}`);
 
-        if (storedEmail === email && storedPasswordHash === incomingHash) {
+        if (storedPasswordHash === incomingHash) {
           localStorage.setItem("auth", "true");
           setIsAuthenticated(true);
           setEmail(email);
@@ -76,7 +84,8 @@ export function useAuth() {
 
         return { success: false, error: "Invalid email or password" };
       } catch (error) {
-        return { success: false, error: "Login failed" };
+        console.error("Login error:", error);
+        return { success: false, error: "Login failed. Please try again." };
       }
     },
     [setLocation]

@@ -14,7 +14,9 @@ export default function Profile() {
   const searchHistoryData = (() => {
     const saved = localStorage.getItem("searchHistory");
     try {
-      return saved ? JSON.parse(saved) : [];
+      const parsed = saved ? JSON.parse(saved) : [];
+      // Flatten repositories from each search record
+      return parsed.flatMap((record: any) => record.repositories || []).slice(0, 10);
     } catch {
       return [];
     }
@@ -87,20 +89,6 @@ export default function Profile() {
             </div>
 
             <div className="border-t border-white/10 pt-8 mb-8">
-              <h3 className="font-bold mb-4">Account Type</h3>
-              <div className="flex items-center justify-between p-4 rounded-xl border border-primary/20 bg-primary/5">
-                <div>
-                  <div className="font-bold text-primary capitalize">{loginTypeLabel}</div>
-                  <div className="text-sm text-muted-foreground">
-                    {userType === "new" && "New account created"}
-                    {userType === "existing" && "Returning user"}
-                    {userType === "github" && "Connected via GitHub"}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="border-t border-white/10 pt-8 mb-8">
               <h3 className="font-bold mb-4">Your Activity</h3>
               <div className="grid grid-cols-2 gap-4">
                 <div className="p-4 rounded-xl bg-white/5">
@@ -122,10 +110,12 @@ export default function Profile() {
                     Clear
                   </Button>
                 </div>
-                <div className="space-y-2 max-h-40 overflow-y-auto">
-                  {searchHistoryData.slice(0, 5).map((item: any, idx: number) => (
-                    <div key={idx} className="text-sm p-2 rounded bg-white/5">
-                      "{item.query}" • {item.repoCount} repos
+                <div className="space-y-2 max-h-64 overflow-y-auto">
+                  {searchHistoryData.slice(0, 10).map((item: any, idx: number) => (
+                    <div key={idx} className="text-sm p-3 rounded bg-white/5 border border-white/5 hover:border-primary/20">
+                      <div className="font-semibold text-white">{item.full_name}</div>
+                      <div className="text-xs text-muted-foreground mt-1">{item.description || "No description"}</div>
+                      <div className="text-xs text-primary mt-2">⭐ {item.stargazers_count} • {item.language || "Unknown"}</div>
                     </div>
                   ))}
                 </div>
