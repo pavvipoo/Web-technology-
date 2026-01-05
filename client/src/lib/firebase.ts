@@ -1,14 +1,10 @@
-import { initializeApp } from "firebase/app";
-import { getAuth, Auth } from "firebase/auth";
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
 
-const firebaseConfig = {
-  apiKey: "AIzaSyDemoKeyForDevelopment_ReplaceWithYours",
-  authDomain: "replit-github-explorer.firebaseapp.com",
-  projectId: "replit-github-explorer",
-  storageBucket: "replit-github-explorer.appspot.com",
-  messagingSenderId: "123456789012",
-  appId: "1:123456789012:web:abcdef123456",
-};
+const url = import.meta.env.VITE_SUPABASE_URL as string;
+const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
 
-const app = initializeApp(firebaseConfig);
-export const auth: Auth = getAuth(app);
+if (!url || !anonKey) {
+  console.warn("VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY not set in env");
+}
+
+export const supabase: SupabaseClient = createClient(url || "", anonKey || "");

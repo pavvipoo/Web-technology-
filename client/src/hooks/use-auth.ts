@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useLocation } from "wouter";
+import { supabase } from "@/lib/firebase";
 
 export function useAuth() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -9,13 +10,41 @@ export function useAuth() {
   const [, setLocation] = useLocation();
 
   useEffect(() => {
-    const auth = localStorage.getItem("auth");
-    const storedUsername = localStorage.getItem("username");
-    const storedEmail = localStorage.getItem("email");
-    setIsAuthenticated(auth === "true");
-    if (storedUsername) setUsername(storedUsername);
-    if (storedEmail) setEmail(storedEmail);
-    setIsLoading(false);
+    let mounted = true;
+
+    async function init() {
+      const { data } = await supabase.auth.getSession();
+      const session = data.session;
+      if (!mounted) return;
+      if (session?.user) {
+        setIsAuthenticated(true);
+        setEmail(session.user.email || "");
+        const meta = (session.user.user_metadata as any) || {};
+        setUsername(meta.username || "");
+      }
+      setIsLoading(false);
+    }
+
+    init();
+
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!mounted) return;
+      if (session?.user) {
+        setIsAuthenticated(true);
+        setEmail(session.user.email || "");
+        const meta = (session.user.user_metadata as any) || {};
+        setUsername(meta.username || "");
+      } else {
+        setIsAuthenticated(false);
+        setUsername("");
+        setEmail("");
+      }
+    });
+
+    return () => {
+      mounted = false;
+      sub.subscription.unsubscribe();
+    };
   }, []);
 
   const signUp = useCallback(
@@ -25,28 +54,44 @@ export function useAuth() {
           return { success: false, error: "All fields required" };
         }
 
-        if (password.length < 6) {
-          return { success: false, error: "Password must be at least 6 characters" };
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: { data: { username } },
+        });
+
+        if (error) return { success: false, error: error.message };
+
+        // If signUp returned a session, user is already signed in.
+        if (data.session) {
+          setIsAuthenticated(true);
+          if (data.user) {
+            setUsername((data.user.user_metadata as any)?.username || username);
+            setEmail(data.user.email || email);
+          }
+          setLocation("/dashboard");
+          return { success: true };
         }
 
-        const userId = `user_${Date.now()}`;
-        const passwordHash = btoa(`${email}:${password}`);
-        
-        localStorage.setItem("auth", "true");
-        localStorage.setItem("userId", userId);
-        localStorage.setItem("username", username);
-        localStorage.setItem("email", email);
-        localStorage.setItem("passwordHash", passwordHash);
-        localStorage.setItem("joinDate", new Date().toISOString());
-        localStorage.setItem("bookmarks", JSON.stringify([]));
-        localStorage.setItem("searchHistory", JSON.stringify([]));
+        // Otherwise, attempt to sign in immediately (if email confirmation isn't required).
+        const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
 
-        setIsAuthenticated(true);
-        setUsername(username);
-        setEmail(email);
-        setLocation("/dashboard");
-        return { success: true };
-      } catch (error) {
+        if (!signInError && signInData.session) {
+          setIsAuthenticated(true);
+          if (signInData.user) {
+            setUsername((signInData.user.user_metadata as any)?.username || username);
+            setEmail(signInData.user.email || email);
+          }
+          setLocation("/dashboard");
+          return { success: true };
+        }
+
+        // If we reach here there is no session (email confirmation may be required).
+        return { success: true, message: "Please check your email to confirm your account." };
+      } catch (err) {
         return { success: false, error: "Sign up failed" };
       }
     },
@@ -60,31 +105,22 @@ export function useAuth() {
           return { success: false, error: "Email and password are required" };
         }
 
-        const storedEmail = localStorage.getItem("email");
-        const storedPasswordHash = localStorage.getItem("passwordHash");
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
 
-        if (!storedEmail || !storedPasswordHash) {
-          return { success: false, error: "No account found with this email. Please sign up first." };
+        if (error) return { success: false, error: error.message };
+
+        setIsAuthenticated(!!data.session);
+        if (data.user) {
+          setUsername((data.user.user_metadata as any)?.username || "");
+          setEmail(data.user.email || email);
         }
-
-        if (storedEmail !== email) {
-          return { success: false, error: "Invalid email or password" };
-        }
-
-        const incomingHash = btoa(`${email}:${password}`);
-
-        if (storedPasswordHash === incomingHash) {
-          localStorage.setItem("auth", "true");
-          setIsAuthenticated(true);
-          setEmail(email);
-          setUsername(localStorage.getItem("username") || "");
-          setLocation("/dashboard");
-          return { success: true };
-        }
-
-        return { success: false, error: "Invalid email or password" };
-      } catch (error) {
-        console.error("Login error:", error);
+        setLocation("/dashboard");
+        return { success: true };
+      } catch (err) {
+        console.error("Login error:", err);
         return { success: false, error: "Login failed. Please try again." };
       }
     },
@@ -100,15 +136,17 @@ export function useAuth() {
   };
 
   const loginWithGithub = async () => {
-    return { success: false, error: "GitHub login coming soon" };
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({ provider: "github" });
+      if (error) return { success: false, error: error.message };
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: "OAuth login failed" };
+    }
   };
 
-  const logout = useCallback(() => {
-    // Only clear auth flag and session data, keep email/password for future logins
-    localStorage.removeItem("auth");
-    localStorage.removeItem("userId");
-    localStorage.removeItem("bookmarks");
-    localStorage.removeItem("searchHistory");
+  const logout = useCallback(async () => {
+    await supabase.auth.signOut();
     setIsAuthenticated(false);
     setUsername("");
     setEmail("");

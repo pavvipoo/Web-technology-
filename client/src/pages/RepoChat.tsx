@@ -87,57 +87,129 @@ User question: ${input}
 
 Please provide a helpful answer about this repository.`;
 
-      const response = await fetch("/api/chat", {
+      // Call the configured RepoChat function (Supabase Edge Function)
+      const REPOCHAT_URL = import.meta.env.VITE_REPOCHAT_URL || "/api/chat";
+      const response = await fetch(REPOCHAT_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: context }),
       });
 
-      if (!response.ok) throw new Error("Failed to get response");
+      if (!response.ok) {
+        // Try to extract error details from JSON or text to display to user and aid debugging
+        let details = "";
+        try {
+          const j = await response.json().catch(() => null);
+          if (j && j.error) details = typeof j.error === "string" ? j.error : JSON.stringify(j.error);
+          else if (j && j.details) details = typeof j.details === "string" ? j.details : JSON.stringify(j.details);
+        } catch {}
+        if (!details) {
+          try {
+            details = await response.text();
+          } catch {}
+        }
+        throw new Error(`Upstream error: ${response.status} ${details}`);
+      }
 
-      const reader = response.body?.getReader();
-      if (!reader) throw new Error("No response body");
+      const contentType = response.headers.get("content-type") || "";
 
-      let aiContent = "";
-      const decoder = new TextDecoder();
+      // Prepare a streaming AI message so UI can update incrementally
+      const aiId = (Date.now() + 1).toString();
+      const initialAiMsg: ChatMessage = { id: aiId, role: "ai", content: "", timestamp: Date.now() };
+      setMessages((prev) => [...prev, initialAiMsg]);
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
+      if (contentType.includes("text/event-stream") || contentType.includes("stream") || response.body) {
+        // Streamed response: read chunks and append to the last AI message
+        const reader = response.body?.getReader();
+        if (!reader) throw new Error("No response body");
 
-        const text = decoder.decode(value);
-        const lines = text.split("\n");
-        
-        for (const line of lines) {
-          if (line.startsWith("data: ")) {
-            try {
-              const data = JSON.parse(line.slice(6));
-              if (data.content) {
-                aiContent += data.content;
+        const decoder = new TextDecoder();
+        let aiContent = "";
+        let buffer = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+
+          const parts = buffer.split("\n");
+          buffer = parts.pop() || ""; // keep last partial
+
+          for (const part of parts) {
+            const line = part.trim();
+            if (!line) continue;
+
+            // support SSE 'data: {...}' lines
+            if (line.startsWith("data: ")) {
+              const payload = line.slice(6).trim();
+              try {
+                const parsed = JSON.parse(payload);
+                if (parsed.content) {
+                  aiContent += parsed.content;
+                }
+              } catch {
+                aiContent += payload;
               }
+            } else {
+              // raw chunk
+              aiContent += line;
+            }
+          }
+
+          // update the last AI message
+          setMessages((prev) => {
+            const copy = [...prev];
+            const idx = copy.findIndex((m) => m.id === aiId);
+            if (idx !== -1) {
+              copy[idx] = { ...copy[idx], content: aiContent };
+            }
+            return copy;
+          });
+        }
+
+        // flush remaining buffer
+        if (buffer.trim()) {
+          let final = buffer;
+          if (buffer.startsWith("data: ")) {
+            try {
+              const parsed = JSON.parse(buffer.slice(6));
+              final = parsed.content || "";
             } catch {}
           }
+          aiContent += final;
+          setMessages((prev) => {
+            const copy = [...prev];
+            const idx = copy.findIndex((m) => m.id === aiId);
+            if (idx !== -1) {
+              copy[idx] = { ...copy[idx], content: aiContent };
+            }
+            return copy;
+          });
         }
-      }
-
-      if (aiContent.trim()) {
-        const aiMsg: ChatMessage = {
-          id: (Date.now() + 1).toString(),
-          role: "ai",
-          content: aiContent,
-          timestamp: Date.now()
-        };
-        setMessages(prev => [...prev, aiMsg]);
+      } else {
+        // Non-streaming fallback: parse JSON { content }
+        const json = await response.json().catch(() => ({}));
+        const aiContent = json.content || "";
+        setMessages((prev) => {
+          const copy = [...prev];
+          const idx = copy.findIndex((m) => m.id === aiId);
+          if (idx !== -1) {
+            copy[idx] = { ...copy[idx], content: aiContent };
+            return copy;
+          }
+          return [...prev, { id: aiId, role: "ai", content: aiContent, timestamp: Date.now() }];
+        });
       }
     } catch (error) {
-      console.error("Error getting AI response:", error);
-      const errorMsg: ChatMessage = {
-        id: (Date.now() + 1).toString(),
-        role: "ai",
-        content: "Sorry, I had trouble analyzing the repository. Please try again.",
-        timestamp: Date.now()
-      };
-      setMessages(prev => [...prev, errorMsg]);
+        console.error("Error getting AI response:", error);
+        const messageText = error instanceof Error ? error.message : String(error);
+        const errorMsg: ChatMessage = {
+          id: (Date.now() + 1).toString(),
+          role: "ai",
+          content: `Sorry, I had trouble analyzing the repository: ${messageText}`,
+          timestamp: Date.now(),
+        };
+        setMessages((prev) => [...prev, errorMsg]);
     } finally {
       setIsTyping(false);
     }

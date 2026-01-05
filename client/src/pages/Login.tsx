@@ -72,8 +72,8 @@ export default function Login() {
     const result = await loginAsExistingUser(loginData.email, loginData.password);
     if (!result.success) {
       setError(result.error || "Login failed");
-      setIsLoading(false);
     }
+    setIsLoading(false);
   };
 
   const handleGitHubLogin = async () => {
