@@ -14,6 +14,7 @@ import Trending from "@/pages/Trending";
 import RepoChat from "@/pages/RepoChat";
 import Bookmarks from "@/pages/Bookmarks";
 import Profile from "@/pages/Profile";
+import Settings from "@/pages/Settings";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -27,6 +28,7 @@ function Router() {
       <Route path="/chat/:owner/:name" component={RepoChat} />
       <Route path="/bookmarks" component={Bookmarks} />
       <Route path="/profile" component={Profile} />
+      <Route path="/settings" component={Settings} />
       <Route component={NotFound} />
     </Switch>
   );

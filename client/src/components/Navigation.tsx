@@ -9,7 +9,8 @@ import {
   User, 
   LogOut,
   Menu,
-  X
+  X,
+  Settings
 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -61,6 +62,7 @@ export function AppNavbar() {
     { href: "/trending", label: "Trending", icon: TrendingUp },
     { href: "/bookmarks", label: "Bookmarks", icon: Bookmark },
     { href: "/profile", label: "Profile", icon: User },
+    { href: "/settings", label: "Settings", icon: Settings },
   ];
 
   // Add history link for search page functionality

@@ -10,41 +10,27 @@ export function useAuth() {
   const [, setLocation] = useLocation();
 
   useEffect(() => {
-    let mounted = true;
-
-    async function init() {
-      const { data } = await supabase.auth.getSession();
-      const session = data.session;
-      if (!mounted) return;
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setIsAuthenticated(!!session);
       if (session?.user) {
-        setIsAuthenticated(true);
+        setUsername((session.user.user_metadata as any)?.username || "");
         setEmail(session.user.email || "");
-        const meta = (session.user.user_metadata as any) || {};
-        setUsername(meta.username || "");
       }
       setIsLoading(false);
-    }
-
-    init();
-
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!mounted) return;
-      if (session?.user) {
-        setIsAuthenticated(true);
-        setEmail(session.user.email || "");
-        const meta = (session.user.user_metadata as any) || {};
-        setUsername(meta.username || "");
-      } else {
-        setIsAuthenticated(false);
-        setUsername("");
-        setEmail("");
-      }
     });
 
-    return () => {
-      mounted = false;
-      sub.subscription.unsubscribe();
-    };
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setIsAuthenticated(!!session);
+      if (session?.user) {
+        setUsername((session.user.user_metadata as any)?.username || "");
+        setEmail(session.user.email || "");
+      }
+      setIsLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   const signUp = useCallback(

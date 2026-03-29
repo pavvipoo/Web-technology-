@@ -5,9 +5,11 @@ import { AppNavbar } from "@/components/Navigation";
 import { useRepoDetails } from "@/hooks/use-github";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Send, Bot, User as UserIcon, Loader2, Code2, ExternalLink } from "lucide-react";
+import { Send, Bot, User as UserIcon, Loader2, Code2, ExternalLink, MessageSquare, Info, LayoutDashboard } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { type ChatMessage } from "@shared/schema";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { RepoInsights } from "@/components/RepoInsights";
 
 export default function RepoChat() {
   // === STEP 1: CALL ALL HOOKS FIRST ===
@@ -26,6 +28,7 @@ export default function RepoChat() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
+  const [conversationId, setConversationId] = useState<number | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   
   // === STEP 2: GUARD EFFECTS (CHECKS AFTER ALL HOOKS) ===
@@ -42,18 +45,65 @@ export default function RepoChat() {
   }, [authLoading, isAuthenticated, match, setLocation]);
 
   // === STEP 3: BUSINESS LOGIC EFFECTS ===
+  // Initialize or fetch conversation
   useEffect(() => {
-    if (repo && messages.length === 0) {
-      setMessages([
-        {
-          id: "welcome",
-          role: "ai",
-          content: `Hello! I've analyzed the codebase for ${repo.full_name}. Ask me anything about the architecture, functions, or specific files.`,
-          timestamp: Date.now()
+    if (!repo?.full_name || !isAuthenticated) return;
+
+    const initChat = async () => {
+      try {
+        // 1. Fetch all conversations to find one for this repo
+        const convsRes = await fetch("/api/conversations");
+        if (!convsRes.ok) throw new Error("Failed to fetch conversations");
+        const convs = await convsRes.json();
+        
+        // Use full_name as the unique identifier in the title
+        let existingConv = convs.find((c: any) => c.title === repo.full_name);
+        
+        if (!existingConv) {
+          // 2. Create new conversation if none exists
+          const createRes = await fetch("/api/conversations", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ title: repo.full_name }),
+          });
+          if (!createRes.ok) throw new Error("Failed to create conversation");
+          existingConv = await createRes.json();
         }
-      ]);
-    }
-  }, [repo?.full_name]);
+        
+        setConversationId(existingConv.id);
+
+        // 3. Fetch existing messages for this conversation
+        const msgsRes = await fetch(`/api/conversations/${existingConv.id}`);
+        if (msgsRes.ok) {
+          const data = await msgsRes.json();
+          if (data.messages && data.messages.length > 0) {
+            // Map backend messages to frontend ChatMessage format
+            const mappedMessages: ChatMessage[] = data.messages.map((m: any) => ({
+              id: m.id.toString(),
+              role: m.role === "user" ? "user" : "ai",
+              content: m.content,
+              timestamp: new Date(m.createdAt).getTime()
+            }));
+            setMessages(mappedMessages);
+          } else {
+            // Initial welcome message
+            setMessages([
+              {
+                id: "welcome",
+                role: "ai",
+                content: `Hello! I've analyzed the codebase for ${repo.full_name}. Ask me anything about the architecture, functions, or specific files.`,
+                timestamp: Date.now()
+              }
+            ]);
+          }
+        }
+      } catch (err) {
+        console.error("Error initializing chat persistence:", err);
+      }
+    };
+
+    initChat();
+  }, [repo?.full_name, isAuthenticated]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -77,6 +127,11 @@ export default function RepoChat() {
     setIsTyping(true);
 
     try {
+      // If we don't have a conversation ID yet, we can't save (should be set by useEffect)
+      if (!conversationId) {
+        console.error("No conversation ID set for persistence");
+      }
+
       // Call real Gemini API with repo context
       const context = `Repository: ${repo?.full_name}
 Language: ${repo?.language || "unknown"}
@@ -87,12 +142,18 @@ User question: ${input}
 
 Please provide a helpful answer about this repository.`;
 
-      // Call the configured RepoChat function (Supabase Edge Function)
-      const REPOCHAT_URL = import.meta.env.VITE_REPOCHAT_URL || "/api/chat";
-      const response = await fetch(REPOCHAT_URL, {
+      // Use the conversation-specific endpoint for persistence
+      const CHAT_URL = conversationId 
+        ? `/api/conversations/${conversationId}/messages` 
+        : "/api/chat";
+
+      const response = await fetch(CHAT_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: context }),
+        body: JSON.stringify({ 
+          content: input, // Required by /api/conversations/:id/messages
+          message: context // Still pass context for the AI engine
+        }),
       });
 
       if (!response.ok) {
@@ -251,100 +312,118 @@ Please provide a helpful answer about this repository.`;
     <div className="h-screen bg-background flex flex-col overflow-hidden">
       <AppNavbar />
       
-      <div className="flex-1 max-w-5xl mx-auto w-full p-4 md:p-6 flex flex-col min-h-0">
-        {/* Header */}
-        <div className="flex items-center justify-between gap-4 mb-6 pb-6 border-b border-white/5">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center border border-white/10">
-              <Code2 className="w-6 h-6 text-primary" />
+      <main className="flex-1 flex flex-col max-w-5xl mx-auto w-full p-4 md:p-6 min-h-0">
+        <Tabs defaultValue="chat" className="flex-1 flex flex-col min-h-0">
+          <div className="flex items-center justify-between mb-6 pb-4 border-b border-white/5">
+            <div className="flex items-center gap-4">
+              <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center border border-white/10">
+                <Code2 className="w-5 h-5 text-primary" />
+              </div>
+              <div>
+                <h1 className="text-lg font-bold font-display">{repo?.full_name}</h1>
+                <div className="flex items-center gap-3">
+                  <TabsList className="bg-white/5 border border-white/10 h-8 p-1">
+                    <TabsTrigger value="chat" className="text-xs h-6 px-3">
+                      <MessageSquare className="w-3 h-3 mr-1.5" />
+                      Chat
+                    </TabsTrigger>
+                    <TabsTrigger value="insights" className="text-xs h-6 px-3">
+                      <Info className="w-3 h-3 mr-1.5" />
+                      AI Insights
+                    </TabsTrigger>
+                  </TabsList>
+                </div>
+              </div>
             </div>
-            <div>
-              <h1 className="text-xl font-bold font-display">{repo?.full_name}</h1>
-              <p className="text-sm text-muted-foreground flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                Codebase Indexed • {repo?.language}
-              </p>
+            
+            <div className="hidden sm:flex items-center gap-3">
+              {repo?.html_url && (
+                <a href={repo.html_url} target="_blank" rel="noopener noreferrer">
+                  <Button variant="outline" size="sm" className="h-8 gap-2 border-white/10 hover:bg-white/5 text-xs">
+                    <ExternalLink className="w-3 h-3" />
+                    GitHub
+                  </Button>
+                </a>
+              )}
             </div>
           </div>
-          {repo?.html_url && (
-            <a href={repo.html_url} target="_blank" rel="noopener noreferrer">
-              <Button variant="outline" size="sm" className="gap-2 border-white/10 hover:bg-white/5">
-                <ExternalLink className="w-4 h-4" />
-                View on GitHub
-              </Button>
-            </a>
-          )}
-        </div>
 
-        {/* Chat Area */}
-        <div 
-          ref={scrollRef}
-          className="flex-1 overflow-y-auto space-y-6 pr-4 scroll-smooth"
-        >
-          {messages.map((msg) => (
+          <TabsContent value="chat" className="flex-1 overflow-hidden flex flex-col m-0 data-[state=inactive]:hidden">
             <div 
-              key={msg.id} 
-              className={cn(
-                "flex gap-4 max-w-3xl",
-                msg.role === "user" ? "ml-auto flex-row-reverse" : ""
+              ref={scrollRef}
+              className="flex-1 overflow-y-auto space-y-6 pr-4 scroll-smooth custom-scrollbar"
+            >
+              {messages.map((msg) => (
+                <div 
+                  key={msg.id} 
+                  className={cn(
+                    "flex gap-4 max-w-3xl",
+                    msg.role === "user" ? "ml-auto flex-row-reverse" : ""
+                  )}
+                >
+                  <div className={cn(
+                    "w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-1",
+                    msg.role === "ai" ? "bg-primary text-primary-foreground" : "bg-white/10"
+                  )}>
+                    {msg.role === "ai" ? <Bot className="w-4 h-4" /> : <UserIcon className="w-4 h-4" />}
+                  </div>
+                  
+                  <div className={cn(
+                    "p-4 rounded-2xl text-sm leading-relaxed",
+                    msg.role === "ai" 
+                      ? "bg-white/5 border border-white/5 rounded-tl-none" 
+                      : "bg-primary text-primary-foreground rounded-tr-none shadow-lg shadow-primary/10"
+                  )}>
+                    {msg.content}
+                  </div>
+                </div>
+              ))}
+
+              {isTyping && (
+                <div className="flex gap-4">
+                  <div className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center shrink-0">
+                    <Bot className="w-4 h-4" />
+                  </div>
+                  <div className="bg-white/5 border border-white/5 rounded-2xl rounded-tl-none p-4 flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 bg-white/40 rounded-full animate-bounce [animation-delay:-0.3s]" />
+                    <span className="w-1.5 h-1.5 bg-white/40 rounded-full animate-bounce [animation-delay:-0.15s]" />
+                    <span className="w-1.5 h-1.5 bg-white/40 rounded-full animate-bounce" />
+                  </div>
+                </div>
               )}
-            >
-              <div className={cn(
-                "w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-1",
-                msg.role === "ai" ? "bg-primary text-primary-foreground" : "bg-white/10"
-              )}>
-                {msg.role === "ai" ? <Bot className="w-4 h-4" /> : <UserIcon className="w-4 h-4" />}
-              </div>
-              
-              <div className={cn(
-                "p-4 rounded-2xl text-sm leading-relaxed",
-                msg.role === "ai" 
-                  ? "bg-white/5 border border-white/5 rounded-tl-none" 
-                  : "bg-primary text-primary-foreground rounded-tr-none"
-              )}>
-                {msg.content}
-              </div>
             </div>
-          ))}
 
-          {isTyping && (
-            <div className="flex gap-4">
-              <div className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center shrink-0">
-                <Bot className="w-4 h-4" />
-              </div>
-              <div className="bg-white/5 border border-white/5 rounded-2xl rounded-tl-none p-4 flex items-center gap-1">
-                <span className="w-2 h-2 bg-white/40 rounded-full animate-bounce" />
-                <span className="w-2 h-2 bg-white/40 rounded-full animate-bounce [animation-delay:0.2s]" />
-                <span className="w-2 h-2 bg-white/40 rounded-full animate-bounce [animation-delay:0.4s]" />
-              </div>
+            <div className="pt-6">
+              <form onSubmit={handleSend} className="relative group">
+                <div className="absolute inset-0 bg-primary/20 blur-2xl opacity-0 group-focus-within:opacity-100 transition-opacity duration-700 pointer-events-none" />
+                <Input 
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  placeholder="Ask a question about this repository..."
+                  className="h-14 pl-6 pr-14 rounded-2xl bg-white/5 border-white/10 focus:ring-primary/20 text-base shadow-2xl relative"
+                  autoFocus
+                />
+                <Button 
+                  type="submit" 
+                  size="icon" 
+                  disabled={!input.trim() || isTyping}
+                  className="absolute right-2 top-2 h-10 w-10 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg"
+                >
+                  <Send className="w-4 h-4" />
+                </Button>
+              </form>
             </div>
-          )}
-        </div>
+          </TabsContent>
 
-        {/* Input Area */}
-        <div className="pt-6 mt-2">
-          <form onSubmit={handleSend} className="relative">
-            <Input 
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="Ask a question about this repository..."
-              className="h-14 pl-6 pr-14 rounded-2xl bg-white/5 border-white/10 focus:ring-primary/20 text-base shadow-2xl"
-              autoFocus
+          <TabsContent value="insights" className="flex-1 overflow-y-auto pr-4 custom-scrollbar m-0 data-[state=inactive]:hidden">
+            <RepoInsights 
+              repoName={repo.full_name} 
+              description={repo.description} 
+              language={repo.language} 
             />
-            <Button 
-              type="submit" 
-              size="icon" 
-              disabled={!input.trim() || isTyping}
-              className="absolute right-2 top-2 h-10 w-10 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90"
-            >
-              <Send className="w-4 h-4" />
-            </Button>
-          </form>
-          <p className="text-center text-xs text-muted-foreground mt-3">
-            AI can make mistakes. Please verify important information in the code.
-          </p>
-        </div>
-      </div>
+          </TabsContent>
+        </Tabs>
+      </main>
     </div>
   );
 }

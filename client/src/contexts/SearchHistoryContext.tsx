@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback } from "react";
 import type { Repository } from "@/hooks/use-search-history";
+import { supabase } from "@/lib/firebase";
 
 export interface SearchRecord {
   query: string;
@@ -19,47 +20,58 @@ const SearchHistoryContext = createContext<SearchHistoryContextType | undefined>
 
 export function SearchHistoryProvider({ children }: { children: React.ReactNode }) {
   const [history, setHistory] = useState<SearchRecord[]>([]);
+  const [userId, setUserId] = useState<string | null>(null);
 
-  // Load history on mount
+  // Listen for auth state
   useEffect(() => {
-    const saved = localStorage.getItem("searchHistory");
-    if (saved) {
-      try {
-        setHistory(JSON.parse(saved));
-      } catch {
-        setHistory([]);
-      }
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUserId(session?.user?.id ?? null);
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUserId(session?.user?.id ?? null);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // Load history from Supabase when userId changes
+  useEffect(() => {
+    if (!userId) {
+      setHistory([]); // Clear on logout
+      return;
     }
-  }, []);
-
-  // Listen for storage changes
-  useEffect(() => {
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === "searchHistory" && e.newValue) {
-        try {
-          setHistory(JSON.parse(e.newValue));
-        } catch (error) {
-          console.error("Failed to parse search history", error);
+    fetch(`/api/user/search-history?userId=${encodeURIComponent(userId)}`)
+      .then(r => r.json())
+      .then(data => {
+        if (Array.isArray(data)) {
+          setHistory(data.map((r: any) => ({
+            query: r.query,
+            timestamp: new Date(r.createdAt).getTime(),
+            repositories: r.repositories || [],
+            repoCount: (r.repositories || []).length,
+          })));
         }
-      }
-    };
-
-    window.addEventListener("storage", handleStorageChange);
-    return () => window.removeEventListener("storage", handleStorageChange);
-  }, []);
+      })
+      .catch(err => console.error("Failed to fetch search history:", err));
+  }, [userId]);
 
   const addSearch = useCallback((query: string, repositories: Repository[]) => {
-    setHistory(prev => {
-      const updated = [{ query, timestamp: Date.now(), repositories, repoCount: repositories.length }, ...prev].slice(0, 50);
-      localStorage.setItem("searchHistory", JSON.stringify(updated));
-      return updated;
-    });
-  }, []);
+    if (!userId) return;
+    const record: SearchRecord = { query, timestamp: Date.now(), repositories, repoCount: repositories.length };
+    setHistory(prev => [record, ...prev].slice(0, 50));
+    fetch("/api/user/search-history", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId, query, repositories }),
+    }).catch(err => console.error("Failed to save search:", err));
+  }, [userId]);
 
   const clearHistory = useCallback(() => {
+    if (!userId) return;
     setHistory([]);
-    localStorage.setItem("searchHistory", JSON.stringify([]));
-  }, []);
+    fetch(`/api/user/search-history?userId=${encodeURIComponent(userId)}`, {
+      method: "DELETE",
+    }).catch(err => console.error("Failed to clear search history:", err));
+  }, [userId]);
 
   return (
     <SearchHistoryContext.Provider value={{ history, addSearch, clearHistory, count: history.length }}>
@@ -70,8 +82,6 @@ export function SearchHistoryProvider({ children }: { children: React.ReactNode 
 
 export function useSearchHistoryContext() {
   const context = useContext(SearchHistoryContext);
-  if (!context) {
-    throw new Error("useSearchHistoryContext must be used within SearchHistoryProvider");
-  }
+  if (!context) throw new Error("useSearchHistoryContext must be used within SearchHistoryProvider");
   return context;
 }

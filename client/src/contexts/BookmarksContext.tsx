@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback } from "react";
 import type { GithubRepo } from "@shared/schema";
+import { supabase } from "@/lib/firebase";
 
 interface BookmarksContextType {
   bookmarks: GithubRepo[];
@@ -13,51 +14,53 @@ const BookmarksContext = createContext<BookmarksContextType | undefined>(undefin
 
 export function BookmarksProvider({ children }: { children: React.ReactNode }) {
   const [bookmarks, setBookmarks] = useState<GithubRepo[]>([]);
+  const [userId, setUserId] = useState<string | null>(null);
 
-  // Load bookmarks on mount
+  // Listen for auth state to get user id
   useEffect(() => {
-    const saved = localStorage.getItem("bookmarks");
-    if (saved) {
-      try {
-        setBookmarks(JSON.parse(saved));
-      } catch (e) {
-        console.error("Failed to parse bookmarks", e);
-      }
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUserId(session?.user?.id ?? null);
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUserId(session?.user?.id ?? null);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // Load bookmarks from Supabase when userId changes
+  useEffect(() => {
+    if (!userId) {
+      setBookmarks([]); // Clear on logout
+      return;
     }
-  }, []);
-
-  // Listen for storage changes from other tabs/windows
-  useEffect(() => {
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === "bookmarks" && e.newValue) {
-        try {
-          setBookmarks(JSON.parse(e.newValue));
-        } catch (error) {
-          console.error("Failed to parse bookmarks", error);
-        }
-      }
-    };
-
-    window.addEventListener("storage", handleStorageChange);
-    return () => window.removeEventListener("storage", handleStorageChange);
-  }, []);
+    fetch(`/api/user/bookmarks?userId=${encodeURIComponent(userId)}`)
+      .then(r => r.json())
+      .then(data => {
+        if (Array.isArray(data)) setBookmarks(data);
+      })
+      .catch(err => console.error("Failed to fetch bookmarks:", err));
+  }, [userId]);
 
   const addBookmark = useCallback((repo: GithubRepo) => {
+    if (!userId) return;
     setBookmarks(prev => {
       if (prev.find(b => b.id === repo.id)) return prev;
-      const newBookmarks = [...prev, repo];
-      localStorage.setItem("bookmarks", JSON.stringify(newBookmarks));
-      return newBookmarks;
+      return [...prev, repo];
     });
-  }, []);
+    fetch("/api/user/bookmarks", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId, repo }),
+    }).catch(err => console.error("Failed to save bookmark:", err));
+  }, [userId]);
 
   const removeBookmark = useCallback((repoId: number) => {
-    setBookmarks(prev => {
-      const newBookmarks = prev.filter(b => b.id !== repoId);
-      localStorage.setItem("bookmarks", JSON.stringify(newBookmarks));
-      return newBookmarks;
-    });
-  }, []);
+    if (!userId) return;
+    setBookmarks(prev => prev.filter(b => b.id !== repoId));
+    fetch(`/api/user/bookmarks/${repoId}?userId=${encodeURIComponent(userId)}`, {
+      method: "DELETE",
+    }).catch(err => console.error("Failed to remove bookmark:", err));
+  }, [userId]);
 
   const isBookmarked = useCallback((repoId: number) => {
     return bookmarks.some(b => b.id === repoId);
@@ -72,8 +75,6 @@ export function BookmarksProvider({ children }: { children: React.ReactNode }) {
 
 export function useBookmarks() {
   const context = useContext(BookmarksContext);
-  if (!context) {
-    throw new Error("useBookmarks must be used within BookmarksProvider");
-  }
+  if (!context) throw new Error("useBookmarks must be used within BookmarksProvider");
   return context;
 }
