@@ -1,7 +1,7 @@
 import { db } from "./db";
 import {
   type UserProfile, // Only using the types, no real storage needed for this frontend-only app
-} from "@shared/schema";
+} from "../shared/schema";
 
 export interface IStorage {
   // We keep the interface minimal as requested for a frontend-only app
