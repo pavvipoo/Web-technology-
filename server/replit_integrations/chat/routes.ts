@@ -1,6 +1,9 @@
 import type { Express, Request, Response } from "express";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { chatStorage } from "./storage";
+import { db } from "../../db";
+import { bookmarks, searchHistory } from "../../../shared/models/chat";
+import { eq, and, desc } from "drizzle-orm";
 
 // Standard Gemini SDK initialization
 const genAI = new GoogleGenerativeAI(process.env.AI_INTEGRATIONS_GEMINI_API_KEY || "");
@@ -228,9 +231,6 @@ Return EXACTLY this JSON structure (no other text):
     try {
       const { userId } = req.query;
       if (!userId) return res.status(400).json({ error: "userId is required" });
-      const { db } = await import("../../db");
-      const { bookmarks } = await import("../../../shared/models/chat");
-      const { eq } = await import("drizzle-orm");
       const result = await db.select().from(bookmarks).where(eq(bookmarks.userId, String(userId)));
       res.json(result.map((b: any) => b.repoData));
     } catch (err) {
@@ -244,9 +244,6 @@ Return EXACTLY this JSON structure (no other text):
     try {
       const { userId, repo } = req.body;
       if (!userId || !repo) return res.status(400).json({ error: "userId and repo are required" });
-      const { db } = await import("../../db");
-      const { bookmarks } = await import("../../../shared/models/chat");
-      const { eq, and } = await import("drizzle-orm");
       // Avoid duplicates
       const existing = await db.select().from(bookmarks)
         .where(and(eq(bookmarks.userId, userId), eq(bookmarks.repoId, String(repo.id))));
@@ -265,9 +262,6 @@ Return EXACTLY this JSON structure (no other text):
       const { userId } = req.query;
       const { repoId } = req.params;
       if (!userId) return res.status(400).json({ error: "userId is required" });
-      const { db } = await import("../../db");
-      const { bookmarks } = await import("../../../shared/models/chat");
-      const { eq, and } = await import("drizzle-orm");
       await db.delete(bookmarks).where(and(eq(bookmarks.userId, String(userId)), eq(bookmarks.repoId, repoId)));
       res.json({ message: "Bookmark removed" });
     } catch (err) {
@@ -283,9 +277,6 @@ Return EXACTLY this JSON structure (no other text):
     try {
       const { userId } = req.query;
       if (!userId) return res.status(400).json({ error: "userId is required" });
-      const { db } = await import("../../db");
-      const { searchHistory } = await import("../../../shared/models/chat");
-      const { eq, desc } = await import("drizzle-orm");
       const result = await db.select().from(searchHistory)
         .where(eq(searchHistory.userId, String(userId)))
         .orderBy(desc(searchHistory.createdAt))
@@ -302,8 +293,6 @@ Return EXACTLY this JSON structure (no other text):
     try {
       const { userId, query, repositories } = req.body;
       if (!userId || !query) return res.status(400).json({ error: "userId and query are required" });
-      const { db } = await import("../../db");
-      const { searchHistory } = await import("../../../shared/models/chat");
       await db.insert(searchHistory).values({ userId, query, repositories: repositories || [] });
       res.status(201).json({ message: "Search saved" });
     } catch (err) {
@@ -317,9 +306,6 @@ Return EXACTLY this JSON structure (no other text):
     try {
       const { userId } = req.query;
       if (!userId) return res.status(400).json({ error: "userId is required" });
-      const { db } = await import("../../db");
-      const { searchHistory } = await import("../../../shared/models/chat");
-      const { eq } = await import("drizzle-orm");
       await db.delete(searchHistory).where(eq(searchHistory.userId, String(userId)));
       res.json({ message: "Search history cleared" });
     } catch (err) {
