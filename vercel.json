@@ -5,8 +5,8 @@
   "outputDirectory": "dist",
   "installCommand": "npm install",
   "functions": {
-    "api/*.ts": {
-      "includeFiles": "server/**,shared/**"
+    "api/index.ts": {
+      "maxDuration": 15
     }
   },
   "rewrites": [

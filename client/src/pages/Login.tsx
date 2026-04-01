@@ -11,6 +11,7 @@ export default function Login() {
   const { loginAsNewUser, loginAsExistingUser, loginWithGithub } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
   const [loginData, setLoginData] = useState({ email: "", password: "" });
   const [signupData, setSignupData] = useState({ 
     email: "", 
@@ -22,6 +23,7 @@ export default function Login() {
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setSuccessMessage("");
 
     if (!signupData.email || !signupData.username || !signupData.password || !signupData.confirmPassword) {
       setError("All fields are required");
@@ -48,9 +50,12 @@ export default function Login() {
     setIsLoading(false);
     if (!result.success) {
       setError(result.error || "Sign up failed");
+      setSuccessMessage("");
     } else {
       // Clear form on success
       setSignupData({ email: "", username: "", password: "", confirmPassword: "" });
+      setError("");
+      setSuccessMessage("Check your Gmail and confirm it Only Only confirm And Come back and log in it");
     }
   };
 
