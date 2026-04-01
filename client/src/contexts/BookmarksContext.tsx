@@ -12,6 +12,29 @@ interface BookmarksContextType {
 
 const BookmarksContext = createContext<BookmarksContextType | undefined>(undefined);
 
+const STORAGE_KEY_PREFIX = "repochat_bookmarks_";
+
+function loadBookmarks(userId: string): GithubRepo[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_PREFIX + userId);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch (e) {
+    console.error("Failed to load bookmarks from localStorage:", e);
+  }
+  return [];
+}
+
+function saveBookmarks(userId: string, bookmarks: GithubRepo[]) {
+  try {
+    localStorage.setItem(STORAGE_KEY_PREFIX + userId, JSON.stringify(bookmarks));
+  } catch (e) {
+    console.error("Failed to save bookmarks to localStorage:", e);
+  }
+}
+
 export function BookmarksProvider({ children }: { children: React.ReactNode }) {
   const [bookmarks, setBookmarks] = useState<GithubRepo[]>([]);
   const [userId, setUserId] = useState<string | null>(null);
@@ -27,39 +50,33 @@ export function BookmarksProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Load bookmarks from Supabase when userId changes
+  // Load bookmarks from localStorage when userId changes
   useEffect(() => {
     if (!userId) {
-      setBookmarks([]); // Clear on logout
+      setBookmarks([]);
       return;
     }
-    fetch(`/api/user/bookmarks?userId=${encodeURIComponent(userId)}`)
-      .then(r => r.json())
-      .then(data => {
-        if (Array.isArray(data)) setBookmarks(data);
-      })
-      .catch(err => console.error("Failed to fetch bookmarks:", err));
+    const saved = loadBookmarks(userId);
+    setBookmarks(saved);
   }, [userId]);
 
   const addBookmark = useCallback((repo: GithubRepo) => {
     if (!userId) return;
     setBookmarks(prev => {
       if (prev.find(b => b.id === repo.id)) return prev;
-      return [...prev, repo];
+      const updated = [...prev, repo];
+      saveBookmarks(userId, updated);
+      return updated;
     });
-    fetch("/api/user/bookmarks", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId, repo }),
-    }).catch(err => console.error("Failed to save bookmark:", err));
   }, [userId]);
 
   const removeBookmark = useCallback((repoId: number) => {
     if (!userId) return;
-    setBookmarks(prev => prev.filter(b => b.id !== repoId));
-    fetch(`/api/user/bookmarks/${repoId}?userId=${encodeURIComponent(userId)}`, {
-      method: "DELETE",
-    }).catch(err => console.error("Failed to remove bookmark:", err));
+    setBookmarks(prev => {
+      const updated = prev.filter(b => b.id !== repoId);
+      saveBookmarks(userId, updated);
+      return updated;
+    });
   }, [userId]);
 
   const isBookmarked = useCallback((repoId: number) => {

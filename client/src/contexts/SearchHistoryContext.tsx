@@ -18,6 +18,29 @@ interface SearchHistoryContextType {
 
 const SearchHistoryContext = createContext<SearchHistoryContextType | undefined>(undefined);
 
+const STORAGE_KEY_PREFIX = "repochat_search_history_";
+
+function loadHistory(userId: string): SearchRecord[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_PREFIX + userId);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch (e) {
+    console.error("Failed to load search history from localStorage:", e);
+  }
+  return [];
+}
+
+function saveHistory(userId: string, history: SearchRecord[]) {
+  try {
+    localStorage.setItem(STORAGE_KEY_PREFIX + userId, JSON.stringify(history));
+  } catch (e) {
+    console.error("Failed to save search history to localStorage:", e);
+  }
+}
+
 export function SearchHistoryProvider({ children }: { children: React.ReactNode }) {
   const [history, setHistory] = useState<SearchRecord[]>([]);
   const [userId, setUserId] = useState<string | null>(null);
@@ -33,44 +56,30 @@ export function SearchHistoryProvider({ children }: { children: React.ReactNode 
     return () => subscription.unsubscribe();
   }, []);
 
-  // Load history from Supabase when userId changes
+  // Load history from localStorage when userId changes
   useEffect(() => {
     if (!userId) {
-      setHistory([]); // Clear on logout
+      setHistory([]);
       return;
     }
-    fetch(`/api/user/search-history?userId=${encodeURIComponent(userId)}`)
-      .then(r => r.json())
-      .then(data => {
-        if (Array.isArray(data)) {
-          setHistory(data.map((r: any) => ({
-            query: r.query,
-            timestamp: new Date(r.createdAt).getTime(),
-            repositories: r.repositories || [],
-            repoCount: (r.repositories || []).length,
-          })));
-        }
-      })
-      .catch(err => console.error("Failed to fetch search history:", err));
+    const saved = loadHistory(userId);
+    setHistory(saved);
   }, [userId]);
 
   const addSearch = useCallback((query: string, repositories: Repository[]) => {
     if (!userId) return;
     const record: SearchRecord = { query, timestamp: Date.now(), repositories, repoCount: repositories.length };
-    setHistory(prev => [record, ...prev].slice(0, 50));
-    fetch("/api/user/search-history", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId, query, repositories }),
-    }).catch(err => console.error("Failed to save search:", err));
+    setHistory(prev => {
+      const updated = [record, ...prev].slice(0, 50);
+      saveHistory(userId, updated);
+      return updated;
+    });
   }, [userId]);
 
   const clearHistory = useCallback(() => {
     if (!userId) return;
     setHistory([]);
-    fetch(`/api/user/search-history?userId=${encodeURIComponent(userId)}`, {
-      method: "DELETE",
-    }).catch(err => console.error("Failed to clear search history:", err));
+    saveHistory(userId, []);
   }, [userId]);
 
   return (
