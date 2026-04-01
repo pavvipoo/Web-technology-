@@ -42,22 +42,69 @@ export const searchHistory = pgTable("search_history", {
 // === DATABASE (EXPLICIT CONFIG) ===
 
 let _db: any = null;
-function db() {
-  if (!_db) {
-    // We use the provided credentials directly for maximum reliability
-    const pool = new Pool({
+let _pool: any = null;
+let _tablesCreated = false;
+
+function getPool() {
+  if (!_pool) {
+    _pool = new Pool({
       user: "postgres",
       host: "db.dbanyyxnheukwnmtyura.supabase.co",
       database: "postgres",
       password: "Yash12211@1",
-      port: 6543, // Pooling port
+      port: 6543,
       ssl: { rejectUnauthorized: false },
       connectionTimeoutMillis: 10000,
       max: 1
     });
-    _db = drizzle(pool, { schema: { conversations, messages, bookmarks, searchHistory } });
+  }
+  return _pool;
+}
+
+function db() {
+  if (!_db) {
+    _db = drizzle(getPool(), { schema: { conversations, messages, bookmarks, searchHistory } });
   }
   return _db;
+}
+
+async function ensureTables() {
+  if (_tablesCreated) return;
+  try {
+    const pool = getPool();
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS conversations (
+        id SERIAL PRIMARY KEY,
+        title TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS messages (
+        id SERIAL PRIMARY KEY,
+        conversation_id INTEGER NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+        role TEXT NOT NULL,
+        content TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS bookmarks (
+        id SERIAL PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        repo_id TEXT NOT NULL,
+        repo_data JSONB NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS search_history (
+        id SERIAL PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        query TEXT NOT NULL,
+        repositories JSONB NOT NULL DEFAULT '[]'::jsonb,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+      );
+    `);
+    _tablesCreated = true;
+    console.log("Tables ensured.");
+  } catch (err) {
+    console.error("Table creation error:", err);
+  }
 }
 
 const chatStorage = {
@@ -201,6 +248,7 @@ app.post("/api/repo-insights", async (req, res) => {
 
 app.get("/api/user/bookmarks", async (req: Request, res: Response) => {
   try {
+    await ensureTables();
     const { userId } = req.query;
     if (!userId) return res.status(400).json({ error: "userId required" });
     const result = await db().select().from(bookmarks).where(eq(bookmarks.userId, String(userId)));
@@ -212,6 +260,7 @@ app.get("/api/user/bookmarks", async (req: Request, res: Response) => {
 
 app.post("/api/user/bookmarks", async (req: Request, res: Response) => {
   try {
+    await ensureTables();
     const { userId, repo } = req.body;
     const existing = await db().select().from(bookmarks).where(and(eq(bookmarks.userId, userId), eq(bookmarks.repoId, String(repo.id))));
     if (existing.length > 0) return res.json({ message: "Exists" });
@@ -224,6 +273,7 @@ app.post("/api/user/bookmarks", async (req: Request, res: Response) => {
 
 app.delete("/api/user/bookmarks/:repoId", async (req: Request, res: Response) => {
   try {
+    await ensureTables();
     const { userId } = req.query;
     await db().delete(bookmarks).where(and(eq(bookmarks.userId, String(userId)), eq(bookmarks.repoId, req.params.repoId)));
     res.json({ message: "Removed" });
@@ -236,6 +286,7 @@ app.delete("/api/user/bookmarks/:repoId", async (req: Request, res: Response) =>
 
 app.get("/api/user/search-history", async (req: Request, res: Response) => {
   try {
+    await ensureTables();
     const { userId } = req.query;
     const result = await db().select().from(searchHistory).where(eq(searchHistory.userId, String(userId))).orderBy(desc(searchHistory.createdAt)).limit(50);
     res.json(result);
@@ -246,9 +297,22 @@ app.get("/api/user/search-history", async (req: Request, res: Response) => {
 
 app.post("/api/user/search-history", async (req: Request, res: Response) => {
   try {
+    await ensureTables();
     const { userId, query, repositories } = req.body;
     await db().insert(searchHistory).values({ userId, query, repositories: repositories || [] });
     res.status(201).json({ message: "Saved" });
+  } catch (err: any) {
+    res.status(500).json({ error: "DB Error: " + err.message });
+  }
+});
+
+app.delete("/api/user/search-history", async (req: Request, res: Response) => {
+  try {
+    await ensureTables();
+    const { userId } = req.query;
+    if (!userId) return res.status(400).json({ error: "userId required" });
+    await db().delete(searchHistory).where(eq(searchHistory.userId, String(userId)));
+    res.json({ message: "Cleared" });
   } catch (err: any) {
     res.status(500).json({ error: "DB Error: " + err.message });
   }
