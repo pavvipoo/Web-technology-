@@ -1,108 +1,48 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRoute, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { AppNavbar } from "@/components/Navigation";
 import { useRepoDetails } from "@/hooks/use-github";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Send, Bot, User as UserIcon, Loader2, Code2, ExternalLink, MessageSquare, Info, LayoutDashboard } from "lucide-react";
+import { Send, Bot, User as UserIcon, Loader2, Code2, ExternalLink, MessageSquare, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { type ChatMessage } from "@shared/schema";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RepoInsights } from "@/components/RepoInsights";
 
 export default function RepoChat() {
-  // === STEP 1: CALL ALL HOOKS FIRST ===
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const [, setLocation] = useLocation();
   const [match, params] = useRoute("/chat/:owner/:name");
-  
-  // Safely extract params
+
   const owner = params?.owner || "";
   const name = params?.name || "";
-  
-  // Query hook ALWAYS called
+
   const { data: repo, isLoading: repoLoading } = useRepoDetails(owner, name);
-  
-  // All state hooks
+
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
-  const [conversationId, setConversationId] = useState<number | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
-  
-  // === STEP 2: GUARD EFFECTS (CHECKS AFTER ALL HOOKS) ===
+
   useEffect(() => {
     if (authLoading) return;
-    if (!isAuthenticated) {
-      setLocation("/login");
-      return;
-    }
-    if (!match) {
-      setLocation("/search");
-      return;
-    }
+    if (!isAuthenticated) { setLocation("/login"); return; }
+    if (!match) { setLocation("/search"); return; }
   }, [authLoading, isAuthenticated, match, setLocation]);
 
-  // === STEP 3: BUSINESS LOGIC EFFECTS ===
-  // Initialize or fetch conversation
+  // Welcome message when repo loads
   useEffect(() => {
     if (!repo?.full_name || !isAuthenticated) return;
-
-    const initChat = async () => {
-      try {
-        // 1. Fetch all conversations to find one for this repo
-        const convsRes = await fetch("/api/conversations");
-        if (!convsRes.ok) throw new Error("Failed to fetch conversations");
-        const convs = await convsRes.json();
-        
-        // Use full_name as the unique identifier in the title
-        let existingConv = convs.find((c: any) => c.title === repo.full_name);
-        
-        if (!existingConv) {
-          // 2. Create new conversation if none exists
-          const createRes = await fetch("/api/conversations", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ title: repo.full_name }),
-          });
-          if (!createRes.ok) throw new Error("Failed to create conversation");
-          existingConv = await createRes.json();
-        }
-        
-        setConversationId(existingConv.id);
-
-        // 3. Fetch existing messages for this conversation
-        const msgsRes = await fetch(`/api/conversations/${existingConv.id}`);
-        if (msgsRes.ok) {
-          const data = await msgsRes.json();
-          if (data.messages && data.messages.length > 0) {
-            // Map backend messages to frontend ChatMessage format
-            const mappedMessages: ChatMessage[] = data.messages.map((m: any) => ({
-              id: m.id.toString(),
-              role: m.role === "user" ? "user" : "ai",
-              content: m.content,
-              timestamp: new Date(m.createdAt).getTime()
-            }));
-            setMessages(mappedMessages);
-          } else {
-            // Initial welcome message
-            setMessages([
-              {
-                id: "welcome",
-                role: "ai",
-                content: `Hello! I've analyzed the codebase for ${repo.full_name}. Ask me anything about the architecture, functions, or specific files.`,
-                timestamp: Date.now()
-              }
-            ]);
-          }
-        }
-      } catch (err) {
-        console.error("Error initializing chat persistence:", err);
-      }
-    };
-
-    initChat();
+    setMessages([
+      {
+        id: "welcome",
+        role: "ai",
+        content: `Hello! I'm your AI assistant for **${repo.full_name}**. This is a ${repo.language || "code"} repository${repo.description ? ` — ${repo.description}` : ""}. Ask me anything about the code, architecture, or how to use it!`,
+        timestamp: Date.now(),
+      },
+    ]);
   }, [repo?.full_name, isAuthenticated]);
 
   useEffect(() => {
@@ -119,164 +59,48 @@ export default function RepoChat() {
       id: Date.now().toString(),
       role: "user",
       content: input,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     };
 
-    setMessages(prev => [...prev, userMsg]);
+    setMessages((prev) => [...prev, userMsg]);
     setInput("");
     setIsTyping(true);
 
+    const aiId = (Date.now() + 1).toString();
+
     try {
-      // If we don't have a conversation ID yet, we can't save (should be set by useEffect)
-      if (!conversationId) {
-        console.error("No conversation ID set for persistence");
-      }
-
-      // Call real Gemini API with repo context
-      const context = `Repository: ${repo?.full_name}
-Language: ${repo?.language || "unknown"}
-Description: ${repo?.description || "No description"}
-URL: ${repo?.html_url}
-
-User question: ${input}
-
-Please provide a helpful answer about this repository.`;
-
-      // Use the conversation-specific endpoint for persistence
-      const CHAT_URL = conversationId 
-        ? `/api/conversations/${conversationId}/messages` 
-        : "/api/chat";
-
-      const response = await fetch(CHAT_URL, {
+      const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          content: input, // Required by /api/conversations/:id/messages
-          message: context // Still pass context for the AI engine
+        body: JSON.stringify({
+          repoName: repo?.full_name,
+          message: input,
+          context: `Repository: ${repo?.full_name}\nLanguage: ${repo?.language || "unknown"}\nDescription: ${repo?.description || "No description"}`,
         }),
       });
 
-      if (!response.ok) {
-        // Try to extract error details from JSON or text to display to user and aid debugging
-        let details = "";
-        try {
-          const j = await response.json().catch(() => null);
-          if (j && j.error) details = typeof j.error === "string" ? j.error : JSON.stringify(j.error);
-          else if (j && j.details) details = typeof j.details === "string" ? j.details : JSON.stringify(j.details);
-        } catch {}
-        if (!details) {
-          try {
-            details = await response.text();
-          } catch {}
-        }
-        throw new Error(`Upstream error: ${response.status} ${details}`);
-      }
+      const json = await response.json().catch(() => ({}));
+      const aiContent = json.reply || json.content || "Sorry, I could not get a response. Please try again.";
 
-      const contentType = response.headers.get("content-type") || "";
-
-      // Prepare a streaming AI message so UI can update incrementally
-      const aiId = (Date.now() + 1).toString();
-      const initialAiMsg: ChatMessage = { id: aiId, role: "ai", content: "", timestamp: Date.now() };
-      setMessages((prev) => [...prev, initialAiMsg]);
-
-      if (contentType.includes("text/event-stream") || contentType.includes("stream") || response.body) {
-        // Streamed response: read chunks and append to the last AI message
-        const reader = response.body?.getReader();
-        if (!reader) throw new Error("No response body");
-
-        const decoder = new TextDecoder();
-        let aiContent = "";
-        let buffer = "";
-
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          buffer += decoder.decode(value, { stream: true });
-
-          const parts = buffer.split("\n");
-          buffer = parts.pop() || ""; // keep last partial
-
-          for (const part of parts) {
-            const line = part.trim();
-            if (!line) continue;
-
-            // support SSE 'data: {...}' lines
-            if (line.startsWith("data: ")) {
-              const payload = line.slice(6).trim();
-              try {
-                const parsed = JSON.parse(payload);
-                if (parsed.content) {
-                  aiContent += parsed.content;
-                }
-              } catch {
-                aiContent += payload;
-              }
-            } else {
-              // raw chunk
-              aiContent += line;
-            }
-          }
-
-          // update the last AI message
-          setMessages((prev) => {
-            const copy = [...prev];
-            const idx = copy.findIndex((m) => m.id === aiId);
-            if (idx !== -1) {
-              copy[idx] = { ...copy[idx], content: aiContent };
-            }
-            return copy;
-          });
-        }
-
-        // flush remaining buffer
-        if (buffer.trim()) {
-          let final = buffer;
-          if (buffer.startsWith("data: ")) {
-            try {
-              const parsed = JSON.parse(buffer.slice(6));
-              final = parsed.content || "";
-            } catch {}
-          }
-          aiContent += final;
-          setMessages((prev) => {
-            const copy = [...prev];
-            const idx = copy.findIndex((m) => m.id === aiId);
-            if (idx !== -1) {
-              copy[idx] = { ...copy[idx], content: aiContent };
-            }
-            return copy;
-          });
-        }
-      } else {
-        // Non-streaming fallback: parse JSON { content }
-        const json = await response.json().catch(() => ({}));
-        const aiContent = json.content || "";
-        setMessages((prev) => {
-          const copy = [...prev];
-          const idx = copy.findIndex((m) => m.id === aiId);
-          if (idx !== -1) {
-            copy[idx] = { ...copy[idx], content: aiContent };
-            return copy;
-          }
-          return [...prev, { id: aiId, role: "ai", content: aiContent, timestamp: Date.now() }];
-        });
-      }
+      setMessages((prev) => [
+        ...prev,
+        { id: aiId, role: "ai", content: aiContent, timestamp: Date.now() },
+      ]);
     } catch (error) {
-        console.error("Error getting AI response:", error);
-        const messageText = error instanceof Error ? error.message : String(error);
-        const errorMsg: ChatMessage = {
-          id: (Date.now() + 1).toString(),
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: aiId,
           role: "ai",
-          content: `Sorry, I had trouble analyzing the repository: ${messageText}`,
+          content: "Sorry, I had trouble connecting to the AI. Please try again.",
           timestamp: Date.now(),
-        };
-        setMessages((prev) => [...prev, errorMsg]);
+        },
+      ]);
     } finally {
       setIsTyping(false);
     }
   };
 
-  // === STEP 4: CONDITIONAL RENDER (SAFE - AFTER ALL HOOKS & EFFECTS) ===
   if (authLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -285,9 +109,7 @@ Please provide a helpful answer about this repository.`;
     );
   }
 
-  if (!isAuthenticated || !match || !owner || !name) {
-    return null;
-  }
+  if (!isAuthenticated || !match || !owner || !name) return null;
 
   if (repoLoading) {
     return (
@@ -311,7 +133,7 @@ Please provide a helpful answer about this repository.`;
   return (
     <div className="h-screen bg-background flex flex-col overflow-hidden">
       <AppNavbar />
-      
+
       <main className="flex-1 flex flex-col max-w-5xl mx-auto w-full p-4 md:p-6 min-h-0">
         <Tabs defaultValue="chat" className="flex-1 flex flex-col min-h-0">
           <div className="flex items-center justify-between mb-6 pb-4 border-b border-white/5">
@@ -335,7 +157,7 @@ Please provide a helpful answer about this repository.`;
                 </div>
               </div>
             </div>
-            
+
             <div className="hidden sm:flex items-center gap-3">
               {repo?.html_url && (
                 <a href={repo.html_url} target="_blank" rel="noopener noreferrer">
@@ -349,31 +171,35 @@ Please provide a helpful answer about this repository.`;
           </div>
 
           <TabsContent value="chat" className="flex-1 overflow-hidden flex flex-col m-0 data-[state=inactive]:hidden">
-            <div 
+            <div
               ref={scrollRef}
               className="flex-1 overflow-y-auto space-y-6 pr-4 scroll-smooth custom-scrollbar"
             >
               {messages.map((msg) => (
-                <div 
-                  key={msg.id} 
+                <div
+                  key={msg.id}
                   className={cn(
                     "flex gap-4 max-w-3xl",
                     msg.role === "user" ? "ml-auto flex-row-reverse" : ""
                   )}
                 >
-                  <div className={cn(
-                    "w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-1",
-                    msg.role === "ai" ? "bg-primary text-primary-foreground" : "bg-white/10"
-                  )}>
+                  <div
+                    className={cn(
+                      "w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-1",
+                      msg.role === "ai" ? "bg-primary text-primary-foreground" : "bg-white/10"
+                    )}
+                  >
                     {msg.role === "ai" ? <Bot className="w-4 h-4" /> : <UserIcon className="w-4 h-4" />}
                   </div>
-                  
-                  <div className={cn(
-                    "p-4 rounded-2xl text-sm leading-relaxed",
-                    msg.role === "ai" 
-                      ? "bg-white/5 border border-white/5 rounded-tl-none" 
-                      : "bg-primary text-primary-foreground rounded-tr-none shadow-lg shadow-primary/10"
-                  )}>
+
+                  <div
+                    className={cn(
+                      "p-4 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap",
+                      msg.role === "ai"
+                        ? "bg-white/5 border border-white/5 rounded-tl-none"
+                        : "bg-primary text-primary-foreground rounded-tr-none shadow-lg shadow-primary/10"
+                    )}
+                  >
                     {msg.content}
                   </div>
                 </div>
@@ -396,16 +222,16 @@ Please provide a helpful answer about this repository.`;
             <div className="pt-6">
               <form onSubmit={handleSend} className="relative group">
                 <div className="absolute inset-0 bg-primary/20 blur-2xl opacity-0 group-focus-within:opacity-100 transition-opacity duration-700 pointer-events-none" />
-                <Input 
+                <Input
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   placeholder="Ask a question about this repository..."
                   className="h-14 pl-6 pr-14 rounded-2xl bg-white/5 border-white/10 focus:ring-primary/20 text-base shadow-2xl relative"
                   autoFocus
                 />
-                <Button 
-                  type="submit" 
-                  size="icon" 
+                <Button
+                  type="submit"
+                  size="icon"
                   disabled={!input.trim() || isTyping}
                   className="absolute right-2 top-2 h-10 w-10 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg"
                 >
@@ -416,10 +242,10 @@ Please provide a helpful answer about this repository.`;
           </TabsContent>
 
           <TabsContent value="insights" className="flex-1 overflow-y-auto pr-4 custom-scrollbar m-0 data-[state=inactive]:hidden">
-            <RepoInsights 
-              repoName={repo.full_name} 
-              description={repo.description} 
-              language={repo.language} 
+            <RepoInsights
+              repoName={repo.full_name}
+              description={repo.description}
+              language={repo.language}
             />
           </TabsContent>
         </Tabs>
