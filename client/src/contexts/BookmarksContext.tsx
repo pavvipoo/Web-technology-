@@ -55,12 +55,20 @@ export function BookmarksProvider({ children }: { children: React.ReactNode }) {
       if (prev.find(b => b.id === repo.id)) return prev;
       return [...prev, repo];
     });
+    // Check if already exists to avoid duplicates
+    const { data: existing } = await supabase
+      .from("bookmarks")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("repo_id", String(repo.id))
+      .maybeSingle();
+    if (existing) return; // Already saved
     // Save to Supabase
-    const { error } = await supabase.from("bookmarks").upsert({
+    const { error } = await supabase.from("bookmarks").insert({
       user_id: userId,
       repo_id: String(repo.id),
       repo_data: repo,
-    }, { onConflict: "user_id,repo_id" });
+    });
     if (error) console.error("Failed to save bookmark:", error.message);
   }, [userId]);
 
