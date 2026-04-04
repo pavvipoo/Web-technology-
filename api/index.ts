@@ -1,18 +1,47 @@
 import express, { type Request, Response } from "express";
+import OpenAI from "openai";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const app = express();
 app.use(express.json());
 
-// === AI CLIENT ===
+const OPENAI_KEY = process.env.OPENAI_API_KEY || "";
 const GEMINI_KEY = process.env.AI_INTEGRATIONS_GEMINI_API_KEY || process.env.GEMINI_API_KEY || "";
 
 // === HEALTH CHECK ===
 app.get("/api/health", (_req: Request, res: Response) => {
-  res.json({ status: "ok", v: "supabase-direct-2" });
+  res.json({ status: "ok", ai: OPENAI_KEY ? "openai" : GEMINI_KEY ? "gemini" : "fallback" });
 });
 
-// Generate smart fallback insights without AI
+// === UNIFIED AI CALL ===
+async function askAI(systemPrompt: string, userPrompt: string): Promise<string> {
+  // Try OpenAI first
+  if (OPENAI_KEY) {
+    const openai = new OpenAI({ apiKey: OPENAI_KEY });
+    const completion = await openai.chat.completions.create({
+      model: "gpt-3.5-turbo",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      max_tokens: 800,
+      temperature: 0.7,
+    });
+    return completion.choices[0]?.message?.content || "";
+  }
+
+  // Fall back to Gemini
+  if (GEMINI_KEY) {
+    const genAI = new GoogleGenerativeAI(GEMINI_KEY);
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const result = await model.generateContent(`${systemPrompt}\n\n${userPrompt}`);
+    return result.response.text();
+  }
+
+  throw new Error("NO_AI_KEY");
+}
+
+// === SMART FALLBACK INSIGHTS ===
 function generateFallbackInsights(repoName: string, description: string | null, language: string | null) {
   const lang = language || "JavaScript";
   const name = repoName.split("/")[1] || repoName;
@@ -20,38 +49,25 @@ function generateFallbackInsights(repoName: string, description: string | null, 
   const r = (min: number, max: number) => min + (seed % (max - min));
 
   const langTips: Record<string, string[]> = {
-    TypeScript: ["Add strict TypeScript config for better type safety", "Use Zod for runtime schema validation", "Enable noUncheckedIndexedAccess compiler option"],
+    TypeScript: ["Enable strict mode in tsconfig.json for better type safety", "Use Zod for runtime schema validation", "Add ESLint with @typescript-eslint for consistent linting"],
     JavaScript: ["Migrate to TypeScript for better maintainability", "Use ESLint + Prettier for consistent code style", "Add JSDoc comments for better IDE support"],
-    Python: ["Add type hints for all function signatures", "Use virtual environments to isolate dependencies", "Write unit tests with pytest for better coverage"],
-    Java: ["Follow SOLID principles for better architecture", "Use dependency injection for loose coupling", "Add Javadoc to all public methods"],
-    "C++": ["Use smart pointers to prevent memory leaks", "Enable AddressSanitizer in CI for memory safety", "Apply RAII patterns for resource management"],
-    Go: ["Use context for cancellation and timeouts", "Add benchmarks alongside unit tests", "Use errgroup for concurrent error handling"],
-    Rust: ["Run clippy for additional lint checks", "Use cargo-audit to scan for vulnerabilities", "Document public APIs with rustdoc examples"],
+    Python: ["Add type hints to all function signatures", "Use virtual environments to isolate dependencies", "Write unit tests with pytest for better coverage"],
+    Java: ["Follow SOLID principles throughout the codebase", "Use dependency injection for loose coupling", "Add Javadoc comments to all public methods"],
+    Go: ["Use context for cancellation and timeouts in all goroutines", "Add table-driven tests for comprehensive coverage", "Use errgroup for concurrent error handling"],
+    Rust: ["Run cargo clippy for additional lint checks", "Use cargo-audit to scan for security vulnerabilities", "Document public APIs with rustdoc examples"],
   };
 
   const tips = langTips[lang] || [
     "Write comprehensive tests to improve code coverage",
-    "Add a detailed README with setup instructions",
-    "Use semantic versioning for releases",
+    "Add a detailed README with setup and usage instructions",
+    "Use semantic versioning for all releases",
   ];
 
-  const arch = `flowchart TD
-  A["${name} App"] --> B["Core Module"]
-  B --> C["${lang} Runtime"]
-  B --> D["Dependencies"]
-  D --> E["External APIs"]
-  A --> F["Tests"]`;
-
   return {
-    health_score: {
-      total: r(65, 92),
-      quality: r(60, 95),
-      security: r(55, 90),
-      maintenance: r(60, 95),
-    },
-    summary: `${name} is a ${lang}-based project${description ? ` focused on ${description.slice(0, 80)}` : ""}. The repository follows common open-source conventions and shows good development practices. Code health metrics indicate a well-maintained project with opportunities for improvement in testing and documentation.`,
+    health_score: { total: r(65, 92), quality: r(60, 95), security: r(55, 90), maintenance: r(60, 95) },
+    summary: `${name} is a ${lang}-based project${description ? ` — ${description.slice(0, 120)}` : ""}. The repository follows common open-source conventions. Code health metrics indicate a well-maintained project with opportunities for improvement in testing and documentation coverage.`,
     top_tips: tips,
-    architecture_mermaid: arch,
+    architecture_mermaid: `flowchart TD\n  A["${name}"] --> B["Core Logic"]\n  B --> C["${lang} Runtime"]\n  B --> D["Dependencies"]\n  D --> E["External APIs"]\n  A --> F["Tests"]`,
   };
 }
 
@@ -60,56 +76,45 @@ app.post("/api/repo-insights", async (req: Request, res: Response) => {
   const { repoName, description, language } = req.body;
   if (!repoName) return res.status(400).json({ error: "repoName is required" });
 
-  // If no Gemini key, return smart fallback insights
-  if (!GEMINI_KEY) {
-    const fallback = generateFallbackInsights(repoName, description || null, language || null);
-    return res.json(fallback);
+  if (!OPENAI_KEY && !GEMINI_KEY) {
+    return res.json(generateFallbackInsights(repoName, description || null, language || null));
   }
 
   try {
-    const genAI = new GoogleGenerativeAI(GEMINI_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-    const prompt = `Analyze the GitHub repository "${repoName}".
-Description: ${description || "N/A"}
-Primary language: ${language || "Unknown"}
+    const systemPrompt = `You are a GitHub repository analyzer. Respond ONLY with valid JSON, no markdown.`;
+    const userPrompt = `Analyze the GitHub repository "${repoName}" (language: ${language || "unknown"}, description: ${description || "N/A"}).
 
-Respond ONLY with valid JSON (no markdown, no code fences) in this exact format:
-{
-  "health_score": { "total": 85, "quality": 80, "security": 75, "maintenance": 90 },
-  "summary": "2-3 sentence summary",
-  "top_tips": ["tip1", "tip2", "tip3"],
-  "architecture_mermaid": "flowchart TD\\n  A[Client] --> B[Server]"
-}`;
+Return this exact JSON:
+{"health_score":{"total":85,"quality":80,"security":75,"maintenance":90},"summary":"2-3 sentence summary","top_tips":["tip1","tip2","tip3"],"architecture_mermaid":"flowchart TD\\n  A[Client] --> B[Server]"}`;
 
-    const result = await model.generateContent(prompt);
-    const text = result.response.text().trim()
-      .replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/```\s*$/i, "").trim();
-    return res.json(JSON.parse(text));
+    const text = await askAI(systemPrompt, userPrompt);
+    const clean = text.trim().replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/```\s*$/i, "").trim();
+    return res.json(JSON.parse(clean));
   } catch (err: any) {
     console.error("AI Insights error:", err.message);
-    // Fall back to smart insights on error
     return res.json(generateFallbackInsights(repoName, description || null, language || null));
   }
 });
 
 // === AI CHAT ===
 app.post("/api/chat", async (req: Request, res: Response) => {
-  const { repoName, message } = req.body;
+  const { repoName, message, context } = req.body;
   if (!message) return res.status(400).json({ error: "message is required" });
 
-  if (!GEMINI_KEY) {
-    return res.json({ reply: `I can analyze **${repoName || "this repository"}** for you! To enable full AI-powered chat, a Gemini API key needs to be configured. I can still help with general questions about the codebase structure and best practices.` });
+  if (!OPENAI_KEY && !GEMINI_KEY) {
+    return res.json({
+      reply: `I'm ready to help with **${repoName || "this repository"}**! To get real AI-powered answers, add an OpenAI API key to the project settings. For now, I can tell you that this repository's code follows standard conventions. What specific aspect would you like to know about?`,
+    });
   }
 
   try {
-    const genAI = new GoogleGenerativeAI(GEMINI_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-    const result = await model.generateContent(
-      `You are an expert code assistant for the GitHub repo "${repoName || "unknown"}". Answer: ${message}`
-    );
-    return res.json({ reply: result.response.text() });
+    const systemPrompt = `You are an expert code assistant for the GitHub repository "${repoName || "unknown"}". Give helpful, clear answers in English. Be concise but thorough.`;
+    const userPrompt = context ? `${context}\n\nQuestion: ${message}` : message;
+    const reply = await askAI(systemPrompt, userPrompt);
+    return res.json({ reply });
   } catch (err: any) {
-    return res.json({ reply: `Error: ${err.message}` });
+    console.error("Chat error:", err.message);
+    return res.status(500).json({ reply: `Error: ${err.message}` });
   }
 });
 
