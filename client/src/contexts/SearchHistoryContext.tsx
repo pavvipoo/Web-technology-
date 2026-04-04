@@ -1,8 +1,18 @@
 import { createContext, useContext, useState, useEffect, useCallback } from "react";
-import type { Repository } from "@/hooks/use-search-history";
 import { supabase } from "@/lib/firebase";
 
+export interface Repository {
+  id: number;
+  full_name: string;
+  name: string;
+  description: string | null;
+  stargazers_count: number;
+  language: string | null;
+  html_url: string;
+}
+
 export interface SearchRecord {
+  id?: number;
   query: string;
   timestamp: number;
   repositories: Repository[];
@@ -17,29 +27,6 @@ interface SearchHistoryContextType {
 }
 
 const SearchHistoryContext = createContext<SearchHistoryContextType | undefined>(undefined);
-
-const STORAGE_KEY_PREFIX = "repochat_search_history_";
-
-function loadHistory(userId: string): SearchRecord[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY_PREFIX + userId);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) return parsed;
-    }
-  } catch (e) {
-    console.error("Failed to load search history from localStorage:", e);
-  }
-  return [];
-}
-
-function saveHistory(userId: string, history: SearchRecord[]) {
-  try {
-    localStorage.setItem(STORAGE_KEY_PREFIX + userId, JSON.stringify(history));
-  } catch (e) {
-    console.error("Failed to save search history to localStorage:", e);
-  }
-}
 
 export function SearchHistoryProvider({ children }: { children: React.ReactNode }) {
   const [history, setHistory] = useState<SearchRecord[]>([]);
@@ -56,30 +43,62 @@ export function SearchHistoryProvider({ children }: { children: React.ReactNode 
     return () => subscription.unsubscribe();
   }, []);
 
-  // Load history from localStorage when userId changes
+  // Fetch search history from Supabase when user logs in
   useEffect(() => {
     if (!userId) {
       setHistory([]);
       return;
     }
-    const saved = loadHistory(userId);
-    setHistory(saved);
+    supabase
+      .from("search_history")
+      .select("id, query, repositories, created_at")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(50)
+      .then(({ data, error }) => {
+        if (error) {
+          console.error("Failed to fetch search history:", error.message);
+          return;
+        }
+        if (data) {
+          setHistory(data.map((row: any) => ({
+            id: row.id,
+            query: row.query,
+            timestamp: new Date(row.created_at).getTime(),
+            repositories: row.repositories || [],
+            repoCount: (row.repositories || []).length,
+          })));
+        }
+      });
   }, [userId]);
 
-  const addSearch = useCallback((query: string, repositories: Repository[]) => {
+  const addSearch = useCallback(async (query: string, repositories: Repository[]) => {
     if (!userId) return;
-    const record: SearchRecord = { query, timestamp: Date.now(), repositories, repoCount: repositories.length };
-    setHistory(prev => {
-      const updated = [record, ...prev].slice(0, 50);
-      saveHistory(userId, updated);
-      return updated;
+    const record: SearchRecord = {
+      query,
+      timestamp: Date.now(),
+      repositories,
+      repoCount: repositories.length,
+    };
+    // Optimistic UI update
+    setHistory(prev => [record, ...prev].slice(0, 50));
+    // Save to Supabase
+    const { error } = await supabase.from("search_history").insert({
+      user_id: userId,
+      query,
+      repositories,
     });
+    if (error) console.error("Failed to save search:", error.message);
   }, [userId]);
 
-  const clearHistory = useCallback(() => {
+  const clearHistory = useCallback(async () => {
     if (!userId) return;
     setHistory([]);
-    saveHistory(userId, []);
+    const { error } = await supabase
+      .from("search_history")
+      .delete()
+      .eq("user_id", userId);
+    if (error) console.error("Failed to clear history:", error.message);
   }, [userId]);
 
   return (

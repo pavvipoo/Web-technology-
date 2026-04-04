@@ -12,34 +12,11 @@ interface BookmarksContextType {
 
 const BookmarksContext = createContext<BookmarksContextType | undefined>(undefined);
 
-const STORAGE_KEY_PREFIX = "repochat_bookmarks_";
-
-function loadBookmarks(userId: string): GithubRepo[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY_PREFIX + userId);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) return parsed;
-    }
-  } catch (e) {
-    console.error("Failed to load bookmarks from localStorage:", e);
-  }
-  return [];
-}
-
-function saveBookmarks(userId: string, bookmarks: GithubRepo[]) {
-  try {
-    localStorage.setItem(STORAGE_KEY_PREFIX + userId, JSON.stringify(bookmarks));
-  } catch (e) {
-    console.error("Failed to save bookmarks to localStorage:", e);
-  }
-}
-
 export function BookmarksProvider({ children }: { children: React.ReactNode }) {
   const [bookmarks, setBookmarks] = useState<GithubRepo[]>([]);
   const [userId, setUserId] = useState<string | null>(null);
 
-  // Listen for auth state to get user id
+  // Listen for auth state
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUserId(session?.user?.id ?? null);
@@ -50,33 +27,54 @@ export function BookmarksProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Load bookmarks from localStorage when userId changes
+  // Fetch bookmarks from Supabase when user logs in
   useEffect(() => {
     if (!userId) {
       setBookmarks([]);
       return;
     }
-    const saved = loadBookmarks(userId);
-    setBookmarks(saved);
+    supabase
+      .from("bookmarks")
+      .select("repo_data")
+      .eq("user_id", userId)
+      .then(({ data, error }) => {
+        if (error) {
+          console.error("Failed to fetch bookmarks:", error.message);
+          return;
+        }
+        if (data) {
+          setBookmarks(data.map((row: any) => row.repo_data as GithubRepo));
+        }
+      });
   }, [userId]);
 
-  const addBookmark = useCallback((repo: GithubRepo) => {
+  const addBookmark = useCallback(async (repo: GithubRepo) => {
     if (!userId) return;
+    // Optimistic UI update
     setBookmarks(prev => {
       if (prev.find(b => b.id === repo.id)) return prev;
-      const updated = [...prev, repo];
-      saveBookmarks(userId, updated);
-      return updated;
+      return [...prev, repo];
     });
+    // Save to Supabase
+    const { error } = await supabase.from("bookmarks").upsert({
+      user_id: userId,
+      repo_id: String(repo.id),
+      repo_data: repo,
+    }, { onConflict: "user_id,repo_id" });
+    if (error) console.error("Failed to save bookmark:", error.message);
   }, [userId]);
 
-  const removeBookmark = useCallback((repoId: number) => {
+  const removeBookmark = useCallback(async (repoId: number) => {
     if (!userId) return;
-    setBookmarks(prev => {
-      const updated = prev.filter(b => b.id !== repoId);
-      saveBookmarks(userId, updated);
-      return updated;
-    });
+    // Optimistic UI update
+    setBookmarks(prev => prev.filter(b => b.id !== repoId));
+    // Delete from Supabase
+    const { error } = await supabase
+      .from("bookmarks")
+      .delete()
+      .eq("user_id", userId)
+      .eq("repo_id", String(repoId));
+    if (error) console.error("Failed to remove bookmark:", error.message);
   }, [userId]);
 
   const isBookmarked = useCallback((repoId: number) => {

@@ -1,5 +1,0 @@
-.env
-node_modules
-server/vite.ts
-dist
-*.log
