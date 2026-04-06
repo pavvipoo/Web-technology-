@@ -6,8 +6,10 @@ import { Input } from "@/components/ui/input";
 import { Github, Loader2, AlertCircle, CheckCircle2 } from "lucide-react";
 import { motion } from "framer-motion";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Login() {
+  const { toast } = useToast();
   const { loginAsNewUser, loginAsExistingUser, loginWithGithub } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
@@ -82,12 +84,10 @@ export default function Login() {
   };
 
   const handleGitHubLogin = async () => {
-    setIsLoading(true);
-    const result = await loginWithGithub();
-    if (!result.success) {
-      setError(result.error || "GitHub login failed");
-    }
-    setIsLoading(false);
+    toast({
+      title: "Coming Soon",
+      description: "GitHub login is coming soon.",
+    });
   };
 
   return (
@@ -149,7 +149,16 @@ export default function Login() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-sm font-medium text-muted-foreground">Password</label>
+                    <div className="flex items-center justify-between">
+                      <label className="text-sm font-medium text-muted-foreground">Password</label>
+                      <button 
+                        type="button"
+                        onClick={() => toast({ title: "Coming Soon", description: "Password reset is coming soon." })}
+                        className="text-sm text-primary hover:underline hover:text-primary/80 transition-colors"
+                      >
+                        Forgot password?
+                      </button>
+                    </div>
                     <Input 
                       type="password" 
                       placeholder="••••••••"
