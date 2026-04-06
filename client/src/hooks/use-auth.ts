@@ -7,6 +7,7 @@ export function useAuth() {
   const [isLoading, setIsLoading] = useState(true);
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
+  const [createdAt, setCreatedAt] = useState("");
   const [, setLocation] = useLocation();
 
   useEffect(() => {
@@ -15,6 +16,7 @@ export function useAuth() {
       if (session?.user) {
         setUsername((session.user.user_metadata as any)?.username || "");
         setEmail(session.user.email || "");
+        setCreatedAt(session.user.created_at || "");
       }
       setIsLoading(false);
     });
@@ -26,6 +28,7 @@ export function useAuth() {
       if (session?.user) {
         setUsername((session.user.user_metadata as any)?.username || "");
         setEmail(session.user.email || "");
+        setCreatedAt(session.user.created_at || "");
       }
       setIsLoading(false);
     });
@@ -48,35 +51,14 @@ export function useAuth() {
 
         if (error) return { success: false, error: error.message };
 
-        // If signUp returned a session, user is already signed in.
+        // To ensure the "Go to your Gmail" success message shows up,
+        // we forcefully prevent auto-login and sign out if a session was created.
         if (data.session) {
-          setIsAuthenticated(true);
-          if (data.user) {
-            setUsername((data.user.user_metadata as any)?.username || username);
-            setEmail(data.user.email || email);
-          }
-          setLocation("/dashboard");
-          return { success: true };
+           await supabase.auth.signOut();
         }
 
-        // Otherwise, attempt to sign in immediately (if email confirmation isn't required).
-        const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-
-        if (!signInError && signInData.session) {
-          setIsAuthenticated(true);
-          if (signInData.user) {
-            setUsername((signInData.user.user_metadata as any)?.username || username);
-            setEmail(signInData.user.email || email);
-          }
-          setLocation("/dashboard");
-          return { success: true };
-        }
-
-        // If we reach here there is no session (email confirmation may be required).
-        return { success: true, message: "Please check your email to confirm your account." };
+        // Return strictly true without redirecting so the Login.tsx UI can render the green success alert.
+        return { success: true };
       } catch (err) {
         return { success: false, error: "Sign up failed" };
       }
@@ -144,6 +126,7 @@ export function useAuth() {
     isLoading,
     username,
     email,
+    createdAt,
     loginAsNewUser,
     loginAsExistingUser,
     loginWithGithub,

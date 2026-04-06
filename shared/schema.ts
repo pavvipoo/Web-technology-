@@ -2,11 +2,59 @@ import { pgTable, text, serial, integer, boolean, timestamp, jsonb } from "drizz
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-// NOTE: This application is Frontend-Only. 
-// These schemas are primarily used for type generation and consistency,
-// even though we are not using a real database for the main features.
+export type UserRole = "SUPER_ADMIN" | "ADMIN" | "MODERATOR" | "USER";
 
-// === GITHUB API TYPES (Mapped for frontend use) ===
+export const users = pgTable("users", {
+  id: serial("id").primaryKey(),
+  username: text("username").notNull().unique(),
+  email: text("email").notNull().unique(),
+  password: text("password").notNull(),
+  role: text("role").$type<UserRole>().default("USER").notNull(),
+  avatar: text("avatar"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const aiUsageLogs = pgTable("ai_usage_logs", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id),
+  tokensUsed: integer("tokens_used").notNull(),
+  cost: integer("cost").notNull(), // Represented in milli-cents (e.g., 1000 = 1 cent)
+  promptType: text("prompt_type").notNull(), // e.g., 'repo_chat', 'insight'
+  timestamp: timestamp("timestamp").defaultNow().notNull(),
+});
+
+export const adminActivityLogs = pgTable("admin_activity_logs", {
+  id: serial("id").primaryKey(),
+  adminId: integer("admin_id").references(() => users.id),
+  action: text("action").notNull(),
+  targetId: text("target_id"),
+  details: jsonb("details"),
+  timestamp: timestamp("timestamp").defaultNow().notNull(),
+});
+
+export const systemNotifications = pgTable("system_notifications", {
+  id: serial("id").primaryKey(),
+  type: text("type").notNull(), // 'info', 'warning', 'error', 'alert'
+  message: text("message").notNull(),
+  read: boolean("read").default(false).notNull(),
+  timestamp: timestamp("timestamp").defaultNow().notNull(),
+});
+
+// === ZOD SCHEMAS (For Type Safety & Validation) ===
+
+export const insertUserSchema = createInsertSchema(users, {
+  role: z.enum(["SUPER_ADMIN", "ADMIN", "MODERATOR", "USER"]),
+}).extend({
+  email: z.string().email(),
+  password: z.string().min(6),
+}).omit({ 
+  id: true, 
+  createdAt: true 
+});
+
+export type InsertUser = z.infer<typeof insertUserSchema>;
+export type User = typeof users.$inferSelect;
+
 
 export const githubUserSchema = z.object({
   login: z.string(),
@@ -30,9 +78,8 @@ export const githubRepoSchema = z.object({
 export type GithubUser = z.infer<typeof githubUserSchema>;
 export type GithubRepo = z.infer<typeof githubRepoSchema>;
 
-// === SIMULATED TYPES (For LocalStorage/Mocking) ===
+// === SIMULATED TYPES (Backward Compatibility) ===
 
-// For the simulated Profile page
 export const userProfileSchema = z.object({
   username: z.string(),
   totalSearches: z.number(),
@@ -54,3 +101,4 @@ export const chatMessageSchema = z.object({
 });
 
 export type ChatMessage = z.infer<typeof chatMessageSchema>;
+

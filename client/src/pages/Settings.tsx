@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { AppNavbar } from "@/components/Navigation";
 import { useAuth } from "@/hooks/use-auth";
 import { useSearchHistoryContext } from "@/contexts/SearchHistoryContext";
@@ -8,21 +8,82 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { User, Lock, Shield, Bell, LogOut, ChevronRight, Check, X } from "lucide-react";
+import { User, Lock, Shield, Bell, LogOut, ChevronRight, Check, X, CreditCard, Smartphone, Monitor, Palette, HelpCircle, History, ArrowLeft, Inbox, Award } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { motion, AnimatePresence } from "framer-motion";
 
-const tabs = [
-  { id: "profile", label: "Profile Settings", icon: User },
-  { id: "password", label: "Change Password", icon: Lock },
-  { id: "privacy", label: "Privacy & Data", icon: Shield },
-  { id: "notifications", label: "Notifications", icon: Bell },
-  { id: "logout", label: "Logout", icon: LogOut },
+const categories = [
+  { 
+    id: "profile", 
+    label: "Edit Profile", 
+    desc: "Update your name, bio and personal avatar", 
+    icon: User, 
+    color: "text-blue-400", 
+    bgColor: "bg-blue-400/10" 
+  },
+  { 
+    id: "password", 
+    label: "Login & Security", 
+    desc: "Edit password and security settings", 
+    icon: Lock, 
+    color: "text-orange-400", 
+    bgColor: "bg-orange-400/10" 
+  },
+  { 
+    id: "privacy", 
+    label: "Privacy & Data", 
+    desc: "Manage search records and account data", 
+    icon: Shield, 
+    color: "text-green-400", 
+    bgColor: "bg-green-400/10" 
+  },
+  { 
+    id: "history", 
+    label: "Your Activity", 
+    desc: "View recent searches and dashboard metrics", 
+    icon: History, 
+    color: "text-purple-400", 
+    bgColor: "bg-purple-400/10" 
+  },
+  { 
+    id: "notifications", 
+    label: "Communications", 
+    desc: "Update email preferences and update alerts", 
+    icon: Bell, 
+    color: "text-yellow-400", 
+    bgColor: "bg-yellow-400/10" 
+  },
+  { 
+    id: "payments", 
+    label: "Direct Payments", 
+    desc: "Manage your pro subscriptions and billing", 
+    icon: CreditCard, 
+    color: "text-indigo-400", 
+    bgColor: "bg-indigo-400/10" 
+  },
+  { 
+    id: "appearance", 
+    label: "Display & Theme", 
+    desc: "Switch between dark, light and high contrast", 
+    icon: Palette, 
+    color: "text-pink-400", 
+    bgColor: "bg-pink-400/10" 
+  },
+  { 
+    id: "support", 
+    label: "Customer Support", 
+    desc: "Chat with us for help or report technical bugs", 
+    icon: HelpCircle, 
+    color: "text-cyan-400", 
+    bgColor: "bg-cyan-400/10" 
+  },
 ];
 
 export default function Settings() {
   const { isAuthenticated, isLoading, email, username, logout } = useAuth();
   const { clearHistory } = useSearchHistoryContext();
   const [, setLocation] = useLocation();
-  const [activeTab, setActiveTab] = useState("profile");
+  const [activeTab, setActiveTab] = useState<string | null>(null);
 
   // Profile
   const [displayName, setDisplayName] = useState(username || "");
@@ -38,17 +99,6 @@ export default function Settings() {
     localStorage.getItem("privacy_saveSearch") !== "false"
   );
   const [privacyMsg, setPrivacyMsg] = useState("");
-
-  // Notifications
-  const [notifyUpdates, setNotifyUpdates] = useState(
-    localStorage.getItem("notify_updates") !== "false"
-  );
-  const [notifyTips, setNotifyTips] = useState(
-    localStorage.getItem("notify_tips") === "true"
-  );
-
-  if (isLoading) return null;
-  if (!isAuthenticated) return <Redirect to="/login" />;
 
   const handleProfileSave = async () => {
     try {
@@ -94,188 +144,229 @@ export default function Settings() {
     setTimeout(() => setPrivacyMsg(""), 2000);
   };
 
-  const handleNotificationSave = () => {
-    localStorage.setItem("notify_updates", String(notifyUpdates));
-    localStorage.setItem("notify_tips", String(notifyTips));
-  };
-
   const handleLogout = async () => {
     await logout();
     setLocation("/login");
   };
 
+  if (isLoading) return null;
+  if (!isAuthenticated) return <Redirect to="/login" />;
+
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-[#0d1117] text-[#c9d1d9] font-sans pb-20">
       <AppNavbar />
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-        <h1 className="text-3xl font-bold font-display mb-8">Settings</h1>
-
-        <div className="flex flex-col md:flex-row gap-6">
-          {/* Sidebar */}
-          <div className="md:w-56 flex-shrink-0">
-            <nav className="glass-card rounded-2xl p-2 space-y-1">
-              {tabs.map(tab => {
-                const Icon = tab.icon;
-                const isActive = activeTab === tab.id;
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
-                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left text-sm transition-all ${
-                      isActive
-                        ? "bg-primary/10 text-primary font-medium"
-                        : "text-muted-foreground hover:bg-white/5 hover:text-foreground"
-                    } ${tab.id === "logout" ? "text-red-400 hover:text-red-300 hover:bg-red-500/5" : ""}`}
-                  >
-                    <Icon className="w-4 h-4" />
-                    {tab.label}
-                    {isActive && tab.id !== "logout" && <ChevronRight className="ml-auto w-4 h-4" />}
-                  </button>
-                );
-              })}
-            </nav>
-          </div>
-
-          {/* Content Panel */}
-          <div className="flex-1 glass-card rounded-2xl p-6">
-
-            {/* Profile Settings */}
-            {activeTab === "profile" && (
-              <div className="space-y-6">
-                <h2 className="text-xl font-bold">Profile Settings</h2>
-                <div className="space-y-4">
-                  <div>
-                    <Label className="text-sm text-muted-foreground mb-1 block">Display Name</Label>
-                    <Input
-                      value={displayName}
-                      onChange={e => setDisplayName(e.target.value)}
-                      placeholder="Your display name"
-                      className="bg-white/5 border-white/10"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-sm text-muted-foreground mb-1 block">Email</Label>
-                    <Input value={email || ""} disabled className="bg-white/5 border-white/10 opacity-50 cursor-not-allowed" />
-                    <p className="text-xs text-muted-foreground mt-1">Email cannot be changed here.</p>
-                  </div>
-                  <Button onClick={handleProfileSave} className="gap-2">
-                    <Check className="w-4 h-4" /> Save Changes
-                  </Button>
-                  {profileMsg && <p className="text-sm">{profileMsg}</p>}
-                </div>
-              </div>
-            )}
-
-            {/* Change Password */}
-            {activeTab === "password" && (
-              <div className="space-y-6">
-                <h2 className="text-xl font-bold">Change Password</h2>
-                <div className="space-y-4">
-                  <div>
-                    <Label className="text-sm text-muted-foreground mb-1 block">New Password</Label>
-                    <Input
-                      type="password"
-                      value={newPassword}
-                      onChange={e => setNewPassword(e.target.value)}
-                      placeholder="Min. 6 characters"
-                      className="bg-white/5 border-white/10"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-sm text-muted-foreground mb-1 block">Confirm New Password</Label>
-                    <Input
-                      type="password"
-                      value={confirmPassword}
-                      onChange={e => setConfirmPassword(e.target.value)}
-                      placeholder="Repeat new password"
-                      className="bg-white/5 border-white/10"
-                    />
-                  </div>
-                  <Button onClick={handlePasswordChange} className="gap-2">
-                    <Lock className="w-4 h-4" /> Update Password
-                  </Button>
-                  {passwordMsg && <p className="text-sm">{passwordMsg}</p>}
-                </div>
-              </div>
-            )}
-
-            {/* Privacy & Data */}
-            {activeTab === "privacy" && (
-              <div className="space-y-6">
-                <h2 className="text-xl font-bold">Privacy & Data</h2>
-                <div className="space-y-5">
-                  <div className="flex items-center justify-between p-4 rounded-xl bg-white/5">
-                    <div>
-                      <p className="font-medium">Save Search History</p>
-                      <p className="text-xs text-muted-foreground mt-1">Search queries are stored in your account</p>
+      <main className="max-w-6xl mx-auto px-4 py-10">
+        
+        <AnimatePresence mode="wait">
+          {!activeTab ? (
+            <motion.div 
+              key="landing"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.98 }}
+              transition={{ duration: 0.3 }}
+              className="space-y-10"
+            >
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-[#30363d]">
+                 <div>
+                    <h1 className="text-4xl font-bold tracking-tight text-white">Your Account</h1>
+                    <p className="text-[#8b949e] mt-2">Manage your profile, security, and AI preferences.</p>
+                 </div>
+                 <div className="flex items-center gap-4 bg-[#161b22] p-4 rounded-2xl border border-[#30363d] shadow-sm">
+                    <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-xl">
+                       {username?.charAt(0).toUpperCase() || "U"}
                     </div>
-                    <Switch checked={saveSearch} onCheckedChange={setSaveSearch} />
-                  </div>
-                  <Button variant="outline" onClick={handlePrivacySave} className="gap-2">
-                    <Check className="w-4 h-4" /> Save Privacy Settings
-                  </Button>
-                  <div className="border-t border-white/10 pt-4">
-                    <p className="text-sm text-muted-foreground mb-3">Manage your stored data</p>
-                    <Button variant="destructive" size="sm" onClick={handleClearHistory} className="gap-2">
-                      <X className="w-4 h-4" /> Clear Search History
-                    </Button>
-                  </div>
-                  {privacyMsg && <p className="text-sm">{privacyMsg}</p>}
-                </div>
-              </div>
-            )}
-
-            {/* Notifications */}
-            {activeTab === "notifications" && (
-              <div className="space-y-6">
-                <h2 className="text-xl font-bold">Notifications</h2>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between p-4 rounded-xl bg-white/5">
                     <div>
-                      <p className="font-medium">Product Updates</p>
-                      <p className="text-xs text-muted-foreground mt-1">News about new features and improvements</p>
+                       <div className="font-bold text-white">{username}</div>
+                       <div className="text-xs text-[#8b949e]">{email}</div>
                     </div>
-                    <Switch
-                      checked={notifyUpdates}
-                      onCheckedChange={v => { setNotifyUpdates(v); localStorage.setItem("notify_updates", String(v)); }}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between p-4 rounded-xl bg-white/5">
-                    <div>
-                      <p className="font-medium">AI Tips</p>
-                      <p className="text-xs text-muted-foreground mt-1">Get weekly tips from AI insights analysis</p>
+                 </div>
+              </div>
+
+              {/* Grid Layout inspired by Amazon/Flipkart - Now in Dark Mode */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {categories.map((cat) => {
+                  const Icon = cat.icon;
+                  return (
+                    <motion.button
+                      key={cat.id}
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => {
+                        if (cat.id === "history") setLocation("/history");
+                        else setActiveTab(cat.id);
+                      }}
+                      className="group flex gap-5 p-6 bg-[#161b22]/50 border border-[#30363d] rounded-2xl text-left hover:border-primary/50 hover:bg-[#161b22] hover:shadow-xl hover:shadow-primary/5 transition-all"
+                    >
+                      <div className={cn("w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 shadow-inner", cat.bgColor)}>
+                        <Icon className={cn("w-7 h-7", cat.color)} />
+                      </div>
+                      <div className="space-y-1">
+                        <h3 className="font-bold text-lg text-white group-hover:text-primary transition-colors">{cat.label}</h3>
+                        <p className="text-sm text-[#8b949e] leading-tight">{cat.desc}</p>
+                      </div>
+                    </motion.button>
+                  );
+                })}
+              </div>
+
+              <div className="pt-10 flex justify-center">
+                 <Button 
+                   variant="ghost" 
+                   onClick={handleLogout}
+                   className="text-red-400 hover:text-red-300 hover:bg-red-400/5 px-8 h-12 rounded-xl border border-red-400/20"
+                 >
+                   <LogOut className="w-4 h-4 mr-2" />
+                   Sign out of all sessions
+                 </Button>
+              </div>
+            </motion.div>
+          ) : (
+            <motion.div 
+              key="detail"
+              initial={{ opacity: 0, x: 10 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -10 }}
+              transition={{ duration: 0.3 }}
+              className="space-y-8"
+            >
+              <button 
+                onClick={() => setActiveTab(null)}
+                className="flex items-center gap-2 text-primary hover:underline font-medium mb-10 transition-all font-semibold"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span>Your Account</span>
+              </button>
+
+              <div className="bg-[#161b22] border border-[#30363d] rounded-3xl p-8 sm:p-12 shadow-2xl min-h-[500px]">
+                
+                 {activeTab === "profile" && (
+                    <div className="space-y-12 max-w-2xl">
+                       <div className="space-y-2">
+                          <h2 className="text-3xl font-bold text-white">Edit Profile</h2>
+                          <p className="text-[#8b949e]">Update your public identity on CodeHunt.</p>
+                       </div>
+                       
+                       <div className="space-y-6">
+                          <div className="space-y-3">
+                             <Label className="font-bold text-base text-white">Username</Label>
+                             <Input 
+                               value={displayName} 
+                               onChange={e => setDisplayName(e.target.value)}
+                               className="h-12 rounded-xl bg-[#0d1117] border-[#30363d] text-white focus:ring-primary"
+                             />
+                          </div>
+
+                          <div className="space-y-3">
+                             <Label className="font-bold text-base text-white">Bio</Label>
+                             <textarea 
+                               placeholder="Tell us about yourself..."
+                               className="w-full h-32 p-4 rounded-xl bg-[#0d1117] border border-[#30363d] text-white focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm resize-none"
+                             />
+                          </div>
+                          
+                          <div className="pt-6 border-t border-[#30363d]">
+                            <Button onClick={handleProfileSave} className="h-12 px-10 rounded-xl bg-primary hover:bg-primary/90 font-bold shadow-lg shadow-primary/20 text-white">
+                               Update Profile
+                            </Button>
+                            {profileMsg && <motion.p initial={{opacity:0}} animate={{opacity:1}} className="text-sm mt-4 text-green-400 font-bold">{profileMsg}</motion.p>}
+                          </div>
+                       </div>
                     </div>
-                    <Switch
-                      checked={notifyTips}
-                      onCheckedChange={v => { setNotifyTips(v); localStorage.setItem("notify_tips", String(v)); }}
-                    />
-                  </div>
-                  <Button variant="outline" onClick={handleNotificationSave} className="gap-2">
-                    <Check className="w-4 h-4" /> Save Notification Preferences
-                  </Button>
-                </div>
-              </div>
-            )}
+                 )}
 
-            {/* Logout */}
-            {activeTab === "logout" && (
-              <div className="space-y-6">
-                <h2 className="text-xl font-bold">Sign Out</h2>
-                <p className="text-muted-foreground text-sm">
-                  You'll be signed out of your account. All your data (bookmarks, chats, search history) remains 
-                  safely stored in the database and will be available when you sign in again.
-                </p>
-                <div className="p-4 rounded-xl bg-red-500/5 border border-red-500/10">
-                  <p className="text-sm text-red-400">⚠️ Your data will NOT be deleted. Only your session will end.</p>
-                </div>
-                <Button variant="destructive" onClick={handleLogout} className="gap-2">
-                  <LogOut className="w-4 h-4" /> Sign Out
-                </Button>
-              </div>
-            )}
+                 {activeTab === "password" && (
+                    <div className="space-y-12 max-w-2xl">
+                       <div className="space-y-2">
+                          <h2 className="text-3xl font-bold text-white">Login & Security</h2>
+                          <p className="text-[#8b949e]">Keep your account secure with a strong password.</p>
+                       </div>
 
-          </div>
-        </div>
+                       <div className="space-y-6">
+                          <div className="space-y-3">
+                             <Label className="font-bold text-base text-white">New Password</Label>
+                             <Input 
+                               type="password"
+                               value={newPassword}
+                               onChange={e => setNewPassword(e.target.value)}
+                               className="h-12 rounded-xl bg-[#0d1117] border-[#30363d] text-white"
+                             />
+                          </div>
+                          <div className="space-y-3">
+                             <Label className="font-bold text-base text-white">Confirm Password</Label>
+                             <Input 
+                               type="password"
+                               value={confirmPassword}
+                               onChange={e => setConfirmPassword(e.target.value)}
+                               className="h-12 rounded-xl bg-[#0d1117] border-[#30363d] text-white"
+                             />
+                          </div>
+                          
+                          <div className="pt-6 border-t border-[#30363d]">
+                             <Button onClick={handlePasswordChange} className="h-12 px-10 rounded-xl bg-primary hover:bg-primary/90 font-bold shadow-lg shadow-primary/20 text-white">
+                               Update Security
+                             </Button>
+                             {passwordMsg && <p className="text-sm mt-4 text-red-400 font-bold">{passwordMsg}</p>}
+                          </div>
+                       </div>
+                    </div>
+                 )}
+
+                 {activeTab === "privacy" && (
+                    <div className="space-y-12 max-w-2xl">
+                       <div className="space-y-2">
+                          <h2 className="text-3xl font-bold text-white">Privacy & Data</h2>
+                          <p className="text-[#8b949e]">You control your data. Manage search records below.</p>
+                       </div>
+
+                       <div className="space-y-8">
+                          <div className="flex items-center justify-between p-6 rounded-2xl bg-[#0d1117] border border-[#30363d]">
+                             <div>
+                                <p className="font-bold text-lg text-white">Save Search History</p>
+                                <p className="text-sm text-[#8b949e]">Store repository searches in your cloud account.</p>
+                             </div>
+                             <Switch checked={saveSearch} onCheckedChange={setSaveSearch} />
+                          </div>
+
+                          <div className="flex items-center justify-between p-6 rounded-2xl border-2 border-red-400/10 bg-red-400/5">
+                             <div>
+                                <p className="font-bold text-lg text-red-400">Delete Search History</p>
+                                <p className="text-sm text-red-400/70">Permanently wipe all records of recent searches.</p>
+                             </div>
+                             <Button variant="destructive" size="sm" onClick={handleClearHistory} className="h-10 px-6 rounded-xl font-bold shadow-lg shadow-red-400/10">
+                                Wipe History
+                             </Button>
+                          </div>
+
+                          <div className="pt-6 border-t border-[#30363d]">
+                            <Button onClick={handlePrivacySave} variant="outline" className="h-12 px-10 rounded-xl border-[#30363d] text-white font-bold hover:bg-[#21262d]">
+                               Save Privacy Settings
+                            </Button>
+                            {privacyMsg && <p className="text-sm mt-4 text-green-400 font-bold">{privacyMsg}</p>}
+                          </div>
+                       </div>
+                    </div>
+                 )}
+
+                 {["notifications", "payments", "appearance", "support"].includes(activeTab || "") && (
+                    <div className="flex flex-col items-center justify-center space-y-8 h-[400px]">
+                       <div className="w-24 h-24 bg-primary/10 rounded-full flex items-center justify-center text-primary">
+                          <Inbox className="w-12 h-12 opacity-50" />
+                       </div>
+                       <div className="text-center space-y-3">
+                          <h2 className="text-3xl font-extrabold text-white">Feature In Progress</h2>
+                          <p className="text-[#8b949e] max-w-sm mx-auto">We're developing high-level marketplace and notification features powered by AI. Stay tuned!</p>
+                       </div>
+                       <Button onClick={() => setActiveTab(null)} variant="outline" className="h-12 px-10 rounded-xl border-[#30363d] text-white font-bold hover:bg-[#21262d]">
+                          Back to Dashboard
+                       </Button>
+                    </div>
+                 )}
+
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </main>
     </div>
   );

@@ -55,7 +55,7 @@ export default function Login() {
       // Clear form on success
       setSignupData({ email: "", username: "", password: "", confirmPassword: "" });
       setError("");
-      setSuccessMessage("Check your Gmail and confirm it. Only confirm and come back and log in.");
+      setSuccessMessage("Go to your Gmail → Confirm your email → Come back → Login.");
     }
   };
 

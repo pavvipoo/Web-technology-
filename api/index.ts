@@ -17,28 +17,37 @@ app.get("/api/health", (_req: Request, res: Response) => {
 async function askAI(systemPrompt: string, userPrompt: string): Promise<string> {
   // Try OpenAI first
   if (OPENAI_KEY) {
-    const openai = new OpenAI({ apiKey: OPENAI_KEY });
-    const completion = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo",
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt },
-      ],
-      max_tokens: 800,
-      temperature: 0.7,
-    });
-    return completion.choices[0]?.message?.content || "";
+    try {
+      const openai = new OpenAI({ apiKey: OPENAI_KEY });
+      const completion = await openai.chat.completions.create({
+        model: "gpt-3.5-turbo",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        max_tokens: 800,
+        temperature: 0.7,
+      });
+      return completion.choices[0]?.message?.content || "";
+    } catch (err: any) {
+      console.error("OpenAI failed (falling back to Gemini):", err.message);
+    }
   }
 
   // Fall back to Gemini
   if (GEMINI_KEY) {
-    const genAI = new GoogleGenerativeAI(GEMINI_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-    const result = await model.generateContent(`${systemPrompt}\n\n${userPrompt}`);
-    return result.response.text();
+    try {
+      const genAI = new GoogleGenerativeAI(GEMINI_KEY);
+      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+      const result = await model.generateContent(`${systemPrompt}\n\n${userPrompt}`);
+      return result.response.text();
+    } catch (err: any) {
+      console.error("Gemini failed:", err.message);
+      throw err;
+    }
   }
 
-  throw new Error("NO_AI_KEY");
+  throw new Error("NO_ACTIVE_AI_KEY");
 }
 
 // === SMART FALLBACK INSIGHTS ===
@@ -101,10 +110,10 @@ app.post("/api/chat", async (req: Request, res: Response) => {
   const { repoName, message, context } = req.body;
   if (!message) return res.status(400).json({ error: "message is required" });
 
+  const dummyFallback = `I'm ready to help with **${repoName || "this repository"}**! However, my AI services are currently out of quota or incorrectly configured. Please check your OpenAI or Gemini API keys in the Vercel project settings.`;
+
   if (!OPENAI_KEY && !GEMINI_KEY) {
-    return res.json({
-      reply: `I'm ready to help with **${repoName || "this repository"}**! To get real AI-powered answers, add an OpenAI API key to the project settings. For now, I can tell you that this repository's code follows standard conventions. What specific aspect would you like to know about?`,
-    });
+    return res.json({ reply: dummyFallback });
   }
 
   try {
@@ -114,6 +123,9 @@ app.post("/api/chat", async (req: Request, res: Response) => {
     return res.json({ reply });
   } catch (err: any) {
     console.error("Chat error:", err.message);
+    if (err.message === "NO_ACTIVE_AI_KEY") {
+      return res.json({ reply: dummyFallback });
+    }
     return res.status(500).json({ reply: `Error: ${err.message}` });
   }
 });

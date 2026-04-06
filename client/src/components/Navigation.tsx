@@ -10,7 +10,9 @@ import {
   LogOut,
   Menu,
   X,
-  Settings
+  Settings,
+  History as HistoryIcon,
+  Crown
 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -62,6 +64,8 @@ export function AppNavbar() {
     { href: "/trending", label: "Trending", icon: TrendingUp },
     { href: "/bookmarks", label: "Bookmarks", icon: Bookmark },
     { href: "/profile", label: "Profile", icon: User },
+    { href: "/history", label: "History", icon: HistoryIcon },
+    { href: "/premium", label: "Premium", icon: Crown, premium: true },
     { href: "/settings", label: "Settings", icon: Settings },
   ];
 
@@ -83,19 +87,24 @@ export function AppNavbar() {
 
           {/* Desktop Nav */}
           <div className="hidden md:flex items-center gap-1">
-            {links.map(({ href, label, icon: Icon }) => (
-              <Link key={href} href={href}>
-                <div className={cn(
-                  "px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all duration-200",
-                  location === href 
-                    ? "bg-white/10 text-white shadow-sm" 
-                    : "text-muted-foreground hover:text-white hover:bg-white/5"
-                )}>
-                  <Icon className="w-4 h-4" />
-                  {label}
-                </div>
-              </Link>
-            ))}
+            {links.map((link) => {
+              const { href, label, icon: Icon } = link;
+              return (
+                <Link key={href} href={href}>
+                  <div className={cn(
+                    "px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all duration-200",
+                    location === href 
+                      ? "bg-white/10 text-white shadow-sm" 
+                      : (link as any).premium 
+                        ? "text-amber-400 hover:text-amber-300 hover:bg-amber-400/10"
+                        : "text-muted-foreground hover:text-white hover:bg-white/5"
+                  )}>
+                    <Icon className="w-4 h-4" />
+                    {label}
+                  </div>
+                </Link>
+              );
+            })}
           </div>
 
           <div className="flex items-center gap-2">
@@ -118,19 +127,24 @@ export function AppNavbar() {
               </SheetTrigger>
               <SheetContent side="right" className="bg-card border-l border-white/10">
                 <div className="flex flex-col gap-6 mt-8">
-                  {links.map(({ href, label, icon: Icon }) => (
-                    <Link key={href} href={href} onClick={() => setIsOpen(false)}>
-                      <div className={cn(
-                        "flex items-center gap-3 px-4 py-3 rounded-xl transition-colors",
-                        location === href 
-                          ? "bg-primary/10 text-primary" 
-                          : "text-muted-foreground hover:text-white"
-                      )}>
-                        <Icon className="w-5 h-5" />
-                        <span className="font-medium">{label}</span>
-                      </div>
-                    </Link>
-                  ))}
+                  {links.map((link) => {
+                    const { href, label, icon: Icon } = link;
+                    return (
+                      <Link key={href} href={href} onClick={() => setIsOpen(false)}>
+                        <div className={cn(
+                          "flex items-center gap-3 px-4 py-3 rounded-xl transition-colors",
+                          location === href 
+                            ? "bg-primary/10 text-primary" 
+                            : (link as any).premium
+                              ? "text-amber-500 bg-amber-500/5 hover:bg-amber-500/10"
+                              : "text-muted-foreground hover:text-white"
+                        )}>
+                          <Icon className="w-5 h-5" />
+                          <span className="font-medium">{label}</span>
+                        </div>
+                      </Link>
+                    );
+                  })}
                   <div className="h-px bg-white/10 my-2" />
                   <button 
                     onClick={logout}

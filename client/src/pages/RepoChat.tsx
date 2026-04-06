@@ -143,14 +143,14 @@ export default function RepoChat() {
               </div>
               <div>
                 <h1 className="text-lg font-bold font-display">{repo?.full_name}</h1>
-                <div className="flex items-center gap-3">
-                  <TabsList className="bg-white/5 border border-white/10 h-8 p-1">
-                    <TabsTrigger value="chat" className="text-xs h-6 px-3">
-                      <MessageSquare className="w-3 h-3 mr-1.5" />
+                <div className="flex items-center gap-3 mt-1">
+                  <TabsList className="bg-white/5 border border-white/10 h-10 p-1 shadow-sm rounded-lg">
+                    <TabsTrigger value="chat" className="text-sm font-medium h-8 px-4">
+                      <MessageSquare className="w-4 h-4 mr-2" />
                       Chat
                     </TabsTrigger>
-                    <TabsTrigger value="insights" className="text-xs h-6 px-3">
-                      <Info className="w-3 h-3 mr-1.5" />
+                    <TabsTrigger value="insights" className="text-sm font-medium h-8 px-4">
+                      <Info className="w-4 h-4 mr-2" />
                       AI Insights
                     </TabsTrigger>
                   </TabsList>
