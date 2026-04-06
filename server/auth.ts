@@ -37,17 +37,23 @@ export function setupAuth(app: Express) {
   app.use(passport.initialize());
   app.use(passport.session());
 
-  passport.use(new LocalStrategy(async (username, password, done) => {
-    try {
-      const user = await storage.getUserByUsername(username);
-      if (!user || !(await comparePasswords(password, user.password))) {
-        return done(null, false, { message: "Invalid username or password" });
+  passport.use(new LocalStrategy(
+    { usernameField: "email", passwordField: "password" },
+    async (email, password, done) => {
+      try {
+        const user = await storage.getUserByEmail(email);
+        if (!user || !(await comparePasswords(password, user.password))) {
+          return done(null, false, { message: "Invalid email or password" });
+        }
+        if (user.role === "USER") {
+          return done(null, false, { message: "Access denied. Not an admin account." });
+        }
+        return done(null, user);
+      } catch (err) {
+        return done(err);
       }
-      return done(null, user);
-    } catch (err) {
-      return done(err);
     }
-  }));
+  ));
 
   passport.serializeUser((user: any, done) => done(null, user.id));
   passport.deserializeUser(async (id: number, done) => {

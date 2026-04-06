@@ -16,7 +16,7 @@ import { motion } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 
 const loginSchema = z.object({
-  username: z.string().min(1, "Username is required"),
+  email: z.string().email("Valid email is required"),
   password: z.string().min(1, "Password is required"),
 });
 
@@ -37,7 +37,7 @@ export default function AdminLogin() {
   const form = useForm<LoginValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      username: "",
+      email: "",
       password: "",
     },
   });
@@ -105,16 +105,16 @@ export default function AdminLogin() {
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                 <FormField
                   control={form.control}
-                  name="username"
+                  name="email"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-slate-300">Admin ID</FormLabel>
+                      <FormLabel className="text-slate-300">Admin Email</FormLabel>
                       <FormControl>
                         <div className="relative">
                           <User className="absolute left-3 top-2.5 h-4 w-4 text-slate-500" />
                           <Input 
                             {...field} 
-                            placeholder="username" 
+                            placeholder="admin@example.com" 
                             className="bg-black/40 border-white/10 text-white pl-10 focus:border-blue-500/50 transition-colors"
                           />
                         </div>

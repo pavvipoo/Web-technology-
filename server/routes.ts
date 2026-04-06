@@ -70,10 +70,10 @@ export async function registerRoutes(
       await storage.createUser({
         username: "admin",
         password: hashedPassword,
-        email: "admin@githubexplorer.pro",
+        email: "yashwanthrao498@gmail.com",
         role: "SUPER_ADMIN",
       });
-      console.log("Default SUPER_ADMIN created: admin / admin123");
+      console.log("Default SUPER_ADMIN created: yashwanthrao498@gmail.com / admin123");
     }
   });
 
