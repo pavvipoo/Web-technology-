@@ -10,17 +10,20 @@ import { cn } from "@/lib/utils";
 import { type ChatMessage } from "@shared/schema";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RepoInsights } from "@/components/RepoInsights";
+import { useToast } from "@/hooks/use-toast";
 
 export default function RepoChat() {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const [, setLocation] = useLocation();
   const [match, params] = useRoute("/chat/:owner/:name");
+  const { toast } = useToast();
 
   const owner = params?.owner || "";
   const name = params?.name || "";
 
   const { data: repo, isLoading: repoLoading } = useRepoDetails(owner, name);
 
+  const [activeTab, setActiveTab] = useState("insights");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
@@ -135,7 +138,20 @@ export default function RepoChat() {
       <AppNavbar />
 
       <main className="flex-1 flex flex-col max-w-5xl mx-auto w-full p-4 md:p-6 min-h-0">
-        <Tabs defaultValue="chat" className="flex-1 flex flex-col min-h-0">
+        <Tabs 
+          value={activeTab} 
+          onValueChange={(val) => {
+            if (val === "chat") {
+              toast({
+                title: "Feature Coming Soon",
+                description: "AI Repository Codebase Chat is currently under active beta development and will be available in the next release!",
+              });
+              return;
+            }
+            setActiveTab(val);
+          }} 
+          className="flex-1 flex flex-col min-h-0"
+        >
           <div className="flex items-center justify-between mb-6 pb-4 border-b border-white/5">
             <div className="flex items-center gap-4">
               <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center border border-white/10">

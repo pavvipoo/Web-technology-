@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { useGithubSearch } from "@/hooks/use-github";
 import { useSearchHistory } from "@/hooks/use-search-history";
 import { RepoCard } from "@/components/RepoCard";
-import { Search as SearchIcon, Loader2, Filter } from "lucide-react";
+import { Search as SearchIcon, Loader2, Filter, Mic } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { Redirect } from "wouter";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -16,6 +16,7 @@ export default function Search() {
   const [query, setQuery] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [language, setLanguage] = useState("");
+  const [isListening, setIsListening] = useState(false);
   
   const { data: repos, isLoading, error } = useGithubSearch(searchTerm, language);
 
@@ -28,6 +29,44 @@ export default function Search() {
 
   if (authLoading) return null;
   if (!isAuthenticated) return <Redirect to="/login" />;
+
+  const startListening = () => {
+    const SpeechRecognition =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+      alert("Speech recognition is not supported in your browser. Please try Chrome, Edge, or Safari.");
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.lang = "en-US";
+
+    recognition.onstart = () => {
+      setIsListening(true);
+    };
+
+    recognition.onerror = (event: any) => {
+      console.error("Speech recognition error:", event);
+      setIsListening(false);
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+    };
+
+    recognition.onresult = (event: any) => {
+      const transcript = event.results[0][0].transcript;
+      // Clean up the spoken text (remove trailing periods that some speech APIs add)
+      const cleanTranscript = transcript.trim().replace(/\.$/, "");
+      setQuery(cleanTranscript);
+      setSearchTerm(cleanTranscript);
+    };
+
+    recognition.start();
+  };
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -53,9 +92,23 @@ export default function Search() {
               <Input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search repositories (e.g. facebook/react)..."
-                className="h-12 pl-12 bg-white/5 border-white/10 rounded-xl focus:ring-primary/20"
+                placeholder={isListening ? "Listening... Speak now!" : "Search repositories (e.g. facebook/react)..."}
+                className={`h-12 pl-12 pr-12 bg-white/5 border-white/10 rounded-xl focus:ring-primary/20 transition-all duration-300 ${
+                  isListening ? "ring-2 ring-primary/50 border-primary bg-primary/5 placeholder-primary/50" : ""
+                }`}
               />
+              <button
+                type="button"
+                onClick={startListening}
+                className={`absolute right-4 top-1/2 -translate-y-1/2 p-1.5 rounded-lg transition-all duration-300 ${
+                  isListening
+                    ? "text-red-500 bg-red-500/10 animate-pulse scale-110"
+                    : "text-muted-foreground hover:text-white hover:bg-white/5"
+                }`}
+                title="Search by voice"
+              >
+                <Mic className={`w-5 h-5 ${isListening ? "animate-bounce" : ""}`} />
+              </button>
             </div>
             <Button type="submit" size="lg" className="h-12 px-6 rounded-xl">
               Search
